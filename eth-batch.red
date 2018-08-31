@@ -11,6 +11,13 @@ Red [
 
 #if error? try [_eth-patch_red_][
 #do [_eth-patch_red_: yes]
+#include %config.red
+#include %keys/keys.red
+#include %libs/eth-api.red
+#include %libs/int256.red
+#include %libs/int-encode.red
+#include %ui-base.red
+#include %eth-ui.red
 
 eth-batch: context [
 	payment-stop?: no
@@ -23,6 +30,9 @@ eth-batch: context [
 	payment-addr: none
 	payment-amount: none
 	add-payment-btn: none
+
+	gas-limit: none
+	signed-data: none
 
 	sanitize-payments: func [data [block! none!] /local entry c][
 		if block? data [
@@ -66,8 +76,7 @@ eth-batch: context [
 			either string? result [
 				browse rejoin [explorer result]
 			][							;-- error
-				tx-error/text: rejoin ["Error! Please try again^/^/" form result]
-				view/flags tx-error-dlg 'modal
+				ui-base/show-error-dlg result
 			]
 		]
 	]
@@ -75,7 +84,7 @@ eth-batch: context [
 	do-batch-payment: func [
 		face	[object!]
 		event	[event!]
-		/local from-addr nonce entry addr to-addr amount result idx
+		/local from-addr nonce price-wei limit amount-wei entry addr to-addr amount result idx
 	][
 		if batch-send-btn/text = "Stop" [
 			payment-stop?: yes
@@ -84,9 +93,18 @@ eth-batch: context [
 		clear batch-results
 		payment-stop?: no
 		batch-result-btn/visible?: no
-		from-addr: copy/part pick addr-list/data addr-list/selected 42
-		nonce: eth/get-nonce network from-addr
-		if nonce = -1 [
+		from-addr: copy eth-ui/current/addr
+
+		if error? price-wei: try [string-to-i256 batch-gas-price/text 9] [
+			unview
+			ui-base/show-error-dlg price-wei
+			exit
+		]
+
+		limit: to-integer gas-limit
+
+		if error? nonce: try [eth-api/get-nonce net-type network from-addr] [
+			unview
 			view/flags nonce-error-dlg 'modal
 			exit
 		]
@@ -99,12 +117,23 @@ eth-batch: context [
 			addr: find entry "0x"
 			to-addr: copy/part addr 42
 			amount: trim copy skip addr 42
-			signed-data: sign-transaction
+			if error? amount-wei: try [string-to-i256 amount 18] [
+				unview
+				ui-base/show-error-dlg amount-wei
+				exit
+			]
+			;if 'ok <> res: eth-ui/check-data to-addr price-wei limit amount-wei [
+			;	unview
+			;	ui-base/show-error-dlg res
+			;	exit
+			;]
+
+			signed-data: eth-ui/sign-transaction
 				from-addr
 				to-addr
-				batch-gas-price/text
-				"21000"
-				amount
+				price-wei
+				limit
+				amount-wei
 				nonce
 
 			if payment-stop? [break]
@@ -113,9 +142,7 @@ eth-batch: context [
 				signed-data
 				binary? signed-data
 			][
-				result: eth/call-rpc network 'eth_sendRawTransaction reduce [
-					rejoin ["0x" enbase/base signed-data 16]
-				]
+				result: eth-api/publish-tx net-type network signed-data
 				append batch-results result
 				either string? result [nonce: nonce + 1 "  √"]["  ×"]
 			][
@@ -137,7 +164,7 @@ eth-batch: context [
 		text "Account:" batch-addr-from: lbl
 		text "Gas Price:"  batch-gas-price: field 48 "21" return
 
-		payment-list: text-list font list-font data [] 600x400 below
+		payment-list: text-list font ui-base/list-font data [] 600x400 below
 		button "Add"	[
 			add-payment-dialog/text: "Add payment"
 			add-payment-btn/text: "Add"
@@ -170,6 +197,24 @@ eth-batch: context [
 		] return
 		pad 160x0 add-payment-btn: button "Add" :do-add-payment
 		pad 20x0 button "Cancel" [unview]
+	]
+
+	actors-init: does [
+		batch-send-dialog/actors: make object! [
+			on-close: func [face event][
+				sanitize-payments payment-list/data
+				batch-result-btn/visible?: no
+			]
+		]
+	]
+
+	open-batch-ui: func [addr [string!] /local price-wei][
+		batch-addr-from/text: copy addr
+		gas-limit: either token-contract ["79510"]["21000"]
+		if all [not error? price-wei: try [eth-api/get-gas-price 'standard] price-wei][
+			batch-gas-price/text: form-i256/nopad price-wei 9 2
+		]
+		view batch-send-dialog
 	]
 
 ]

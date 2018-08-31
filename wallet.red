@@ -6,6 +6,7 @@ Red [
 	Needs:	 View
 	Version: 0.1.0
 	Tabs: 	 4
+	Company: "Fullstack technologies"
 	Rights:  "Copyright (C) 2018 Red Foundation. All rights reserved."
 	License: {
 		Distributed under the Boost Software License, Version 1.0.
@@ -22,14 +23,13 @@ Red [
 #include %libs/int-encode.red
 #include %ui-base.red
 #include %eth-ui.red
-
+#include %eth-batch.red
 
 #system [
 	with gui [#include %libs/usb-monitor.reds]
 ]
 
 wallet: context [
-	list-font:		make font! [name: get 'font-fixed size: 11]
 	addr-per-page:	5
 	min-size:		none
 	connected?:		no
@@ -288,7 +288,7 @@ wallet: context [
 		text bold "My Addresses" pad 280x0 
 		text bold "Balances" right return pad 0x-10
 		
-		addr-list: text-list font list-font 520x100 return middle
+		addr-list: text-list font ui-base/list-font 520x100 return middle
 
 		info-msg: text 285x20
 		text right 50 "Page:" tight
@@ -362,6 +362,9 @@ wallet: context [
 			on-menu: func [face [object!] event [event!]][
 				switch event/picked [
 					copy	[copy-addr]
+					batch	[
+						eth-batch/open-batch-ui eth-ui/current/addr
+					]
 				]
 			]
 			on-change: func [face event][
@@ -372,8 +375,11 @@ wallet: context [
 			]
 		]
 
+		eth-batch/actors-init
+
 		addr-list/menu: [
 			"Copy address"		copy
+			"Batch payment"		batch
 		]
 	]
 

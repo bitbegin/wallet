@@ -13,6 +13,7 @@ Red [
 
 ui-base: context [
 	set 'process-events does [loop 10 [do-events/no-wait]]
+	list-font:		make font! [name: get 'font-fixed size: 11]
 
 	tx-error: none
 
@@ -21,7 +22,7 @@ ui-base: context [
 		tx-error: area 400x200
 	]
 
-	show-error-dlg: func [e [error!]][
+	show-error-dlg: func [e][
 		tx-error/text: form e
 		view/flags tx-error-dlg 'modal
 	]

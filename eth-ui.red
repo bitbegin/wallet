@@ -159,7 +159,7 @@ eth-ui: context [
 			tx: reduce [
 				nonce
 				gas-price
-				limit
+				gas-limit
 				debase/base token-contract 16			;-- to address
 				eth-api/eth-to-wei to-i256 0			;-- value
 				rejoin [								;-- data
@@ -172,7 +172,7 @@ eth-ui: context [
 			tx: reduce [
 				nonce
 				gas-price
-				limit
+				gas-limit
 				debase/base skip to-addr 2 16			;-- to address
 				amount
 				#{}										;-- data
@@ -183,15 +183,13 @@ eth-ui: context [
 	]
 
 	do-sign-tx: func [face [object!] event [event!] /local nonce price-wei limit amount-wei res ids][
-		price-wei: try [string-to-i256 gas-price/text 9]
-		if error? price-wei [
+		if error? price-wei: try [string-to-i256 gas-price/text 9] [
 			unview
 			ui-base/show-error-dlg price-wei
 			reset-sign-button
 			exit
 		]
-		amount-wei: try [string-to-i256 amount-field/text 18]
-		if error? amount-wei [
+		if error? amount-wei: try [string-to-i256 amount-field/text 18] [
 			unview
 			ui-base/show-error-dlg amount-wei
 			reset-sign-button
@@ -237,7 +235,7 @@ eth-ui: context [
 				form-i256/nopad mul256 price-wei to-i256 limit 18 8
 				" Ether"
 			]
-			info-nonce/text: mold tx/1
+			info-nonce/text: mold nonce
 			unview
 			view/flags confirm-sheet 'modal
 		][

@@ -22,8 +22,8 @@ token-config: context [
 		;token name
 		"ETH" [
 			['ui "ETH" 'net-name "mainnet"					'network https://eth.red-lang.org/mainnet			'explorer https://etherscan.io/tx/				'path [(default-purpose) (eth-coin) (default-account) (default-change)] 'chain-id 1]
-			['ui "ETH" 'net-name "mainnet(MyEtherWallet)"	'network https://api.myetherapi.com/eth				'explorer https://etherscan.io/tx/				'path [(default-purpose) (eth-coin) (default-account) (default-change)] 'chain-id 1]
 			['ui "ETH" 'net-name "mainnet(mycrypto)"		'network https://api.mycryptoapi.com/eth			'explorer https://etherscan.io/tx/				'path [(default-purpose) (eth-coin) (default-account) (default-change)] 'chain-id 1]
+			['ui "ETH" 'net-name "mainnet(MyEtherWallet)"	'network https://api.myetherapi.com/eth				'explorer https://etherscan.io/tx/				'path [(default-purpose) (eth-coin) (default-account) (default-change)] 'chain-id 1]
 			['ui "ETH" 'net-name "mainnet(ethscan)"			'network https://api.etherscan.io/api				'explorer https://etherscan.io/tx/				'path [(default-purpose) (eth-coin) (default-account) (default-change)] 'chain-id 1 'net-type ethscan]
 			['ui "ETH" 'net-name "mainnet(infura)"			'network https://mainnet.infura.io					'explorer https://etherscan.io/tx/				'path [(default-purpose) (eth-coin) (default-account) (default-change)] 'chain-id 1]
 			['ui "ETH" 'net-name "mainnet(blockscale)"		'network https://api.dev.blockscale.net/dev/parity	'explorer https://etherscan.io/tx/				'path [(default-purpose) (eth-coin) (default-account) (default-change)] 'chain-id 1]
