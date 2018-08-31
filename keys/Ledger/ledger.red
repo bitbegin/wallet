@@ -3,34 +3,27 @@ Red [
 	Author: "Xie Qingtian"
 	File: 	%ledger.red
 	Tabs: 	4
-	License: {
-		Distributed under the Boost Software License, Version 1.0.
-		See https://github.com/red/red/blob/master/BSL-License.txt
-	}
+	License: "BSD-3 - https://github.com/red/red/blob/master/BSD-3-License.txt"
 ]
 
-#include %rlp.red
-
-to-bin8: func [v [integer! char!]][
-	to binary! to char! 256 + v and 255
-]
-
-to-bin16: func [v [integer! char!]][	;-- big-endian encoding
-	skip to-binary to-integer v 2
-]
-
-to-bin32: func [v [integer! char!]][	;-- big-endian encoding
-	to-binary to-integer v
-]
-
-to-int16: func [b [binary!]][
-	to-integer copy/part b 2
-]
+#if error? try [_ledger_red_][
+#do [_ledger_red_: yes]
+#include %../../libs/HID/hidapi.red
+#include %../../libs/int-encode.red
+#include %../../libs/rlp.red
 
 ledger: context [
+	name: "Ledger Nano S"
+
+	system/catalog/errors/user: make system/catalog/errors/user [ledger: ["ledger [" :arg1 ": (" :arg2 " " :arg3 ")]"]]
+
+	new-error: func [name [word!] arg2 arg3][
+		cause-error 'user 'ledger [name arg2 arg3]
+	]
 
 	vendor-id:			2C97h
 	product-id:			1
+	ids: reduce [product-id << 16 or vendor-id]
 
 	DEFAULT_CHANNEL:	0101h
 	TAG_APDU:			05h
@@ -41,11 +34,61 @@ ledger: context [
 	buffer:		make binary! MAX_APDU_SIZE
 	data-frame: make binary! PACKET_SIZE
 
-	connect: func [][
+	request-pin-state: 'Init							;-- Init/Requesting/HasRequested/DeviceError
+
+
+	filter?: func [
+		_id				[integer!]
+		_usage			[integer!]
+		return:			[logic!]
+	][
+		unless find ids _id [return false]
+		if (_usage >>> 16) = FF01h [return false]		;-- skip debug integerface
+		if (_usage >>> 16) = F1D0h [return false]		;-- skip fido integerface
+		true
+	]
+
+	support?: func [
+		_id				[integer!]
+		return:			[logic!]
+	][
+		if find ids _id [return true]
+		false
+	]
+
+	open: func [_id [integer!] index [integer!] return: [handle!]][
 		unless dongle [
-			dongle: hid/open vendor-id product-id
+			dongle: hid/open _id index
 		]
 		dongle
+	]
+
+	close: does [
+		if dongle <> none [
+			hid/close dongle 
+			dongle: none
+		]
+	]
+
+	init: func [unitname [string!] return: [word!] /local res] [
+		case [
+			any [unitname = "ETH" unitname = "RED"] [
+				if string? res: get-eth-public-address [8000002Ch 8000003Ch 80000000h 0 0] [return 'success]
+				res
+			]
+			true [
+				new-error 'init 'unknown unitname
+			]
+		]
+	]
+
+	close-pin-requesting: does [
+		request-pin-state: 'Init
+	]
+
+	request-pin: func [return: [word!]] [
+		request-pin-state: 'HasRequested
+		request-pin-state
 	]
 
 	read-apdu: func [
@@ -115,19 +158,19 @@ ledger: context [
 		]
 	]
 
-	get-address: func [idx [integer!] /local data pub-key-len addr-len][
+
+	get-eth-public-address: func [ids [block!] return: [string! word!] /local data pub-key-len addr-len][
 		data: make binary! 20
 		append data reduce [
 			E0h
 			02h
 			0
 			0
-			4 * 4 + 1
-			4
-			to-bin32 8000002Ch
-			to-bin32 8000003Ch
-			to-bin32 80000000h
-			to-bin32 idx
+			4 * (length? ids) + 1
+		]
+		append data collect [
+			keep length? ids
+			forall ids [keep to-bin32 ids/1]
 		]
 		write-apdu data
 		data: read-apdu 1
@@ -142,10 +185,16 @@ ledger: context [
 			#{BF00018D} = data ['browser-support-on]
 			#{6804} = data ['locked]
 			#{6700} = data ['plug]
+			#{6D00} = data ['app]
+			true ['unknown]
 		]
 	]
 
-	sign-eth-tx: func [addr-idx [integer!] tx [block!] /local data max-sz sz signed][
+	get-eth-address: func [ids [block!] return: [string!]][
+		get-eth-public-address ids
+	]
+
+	sign-eth-tx: func [ids [block!] tx [block!] /local chunk max-sz sz signed][
 		;-- tx: [nonce, gasprice, startgas, to, value, data]
 		tx-bin: rlp/encode tx
 		chunk: make binary! 200
@@ -158,14 +207,11 @@ ledger: context [
 			chunk/2: 04h
 			chunk/3: either head? tx-bin [0][80h]
 			chunk/4: 0
-			chunk/5: either head? tx-bin [sz + 17][sz]
+			chunk/5: either head? tx-bin [sz + (4 * (length? ids) + 1)][sz]
 			if head? tx-bin [
-				append chunk reduce [
-					4
-					to-bin32 8000002Ch
-					to-bin32 8000003Ch
-					to-bin32 80000000h
-					to-bin32 addr-idx
+				append chunk collect [
+					keep length? ids
+					forall ids [keep to-bin32 ids/1]
 				]
 			]
 			append/part chunk tx-bin sz
@@ -177,8 +223,8 @@ ledger: context [
 		either 4 > length? signed [none][signed]
 	]
 
-	get-signed-data: func [idx tx /local signed][
-		signed: sign-eth-tx idx tx
+	get-eth-signed-data: func [ids tx /local signed][
+		signed: sign-eth-tx ids tx
 		either all [signed binary? signed][
 			append tx reduce [
 				copy/part signed 1
@@ -189,11 +235,6 @@ ledger: context [
 		][signed]
 	]
 
-	close: does [hid/close dongle dongle: none]
 ]
 
-;ledger/connect
-
-;probe ledger/get-address 0
-
-;ledger/close
+]
