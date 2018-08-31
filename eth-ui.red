@@ -39,9 +39,6 @@ eth-ui: context [
 
 	signed-data: none
 
-	gas-price-wei: none
-	amount-wei: none
-
 	current: make reactor! [
 		infos: []
 		selected: none
@@ -91,14 +88,14 @@ eth-ui: context [
 		btn-sign/text: "Sign"
 	]
 
-	do-send: func [face [object!] event [event!]][
+	do-send: func [face [object!] event [event!] /local price-wei][
 		if addresses [
 			if current/selected = none [current/selected: 1]
 			network-to/text: net-name
 			addr-from/text: current/addr
 			gas-limit/text: either token-contract ["79510"]["21000"]
-			if all [not error? gas-price-wei: try [eth-api/get-gas-price 'standard] gas-price-wei][
-				gas-price/text: form-i256/nopad gas-price-wei 9 2
+			if all [not error? price-wei: try [eth-api/get-gas-price 'standard] price-wei][
+				gas-price/text: form-i256/nopad price-wei 9 2
 			]
 			reset-sign-button
 			label-unit/text: unit-name
@@ -108,35 +105,36 @@ eth-ui: context [
 		]
 	]
 
-	check-data: func [/local addr amount balance sum][
-		addr: trim any [addr-to/text ""]
+	check-data: func [
+		to-addr			[string!]
+		price-wei		[vector!]
+		limit			[integer!]
+		amount-wei		[vector!]
+		/local
+			amount balance sum
+	][
 		unless all [
-			addr/1 = #"0"
-			addr/2 = #"x"
-			42 = length? addr
-			debase/base skip addr 2 16
+			to-addr/1 = #"0"
+			to-addr/2 = #"x"
+			42 = length? to-addr
+			debase/base skip to-addr 2 16
 		][
-			addr-to/text: copy "Invalid address"
-			return no
+			return 'invalid-addr
 		]
 		either all [
-			vector? gas-price-wei: try [string-to-i256 gas-price/text 9]
-			not negative256? gas-price-wei
-			vector? amount-wei: try [string-to-i256 amount-field/text 18]
+			not negative256? price-wei
 			not negative256? amount-wei
 		][
 			balance: current/balance
-			sum: mul256 gas-price-wei to-i256 to integer! gas-limit/text
+			sum: mul256 price-wei to-i256 limit
 			sum: add256 sum amount-wei
 			unless lesser-or-equal256? sum balance [
-				amount-field/text: copy "Insufficient Balance"
-				return no
+				return 'insufficient-balance
 			]
 		][
-			addr-to/text: copy "Invalid amount"
-			return no
+			return 'invalid-amount
 		]
-		yes
+		'ok
 	]
 
 	notify-user: does [
@@ -148,45 +146,82 @@ eth-ui: context [
 		process-events
 	]
 
-	do-sign-tx: func [face [object!] event [event!] /local tx nonce limit ids][
-		unless check-data [exit]
+	sign-transaction: func [
+		from-addr	[string!]
+		to-addr		[string!]
+		gas-price	[vector!]
+		gas-limit	[integer!]
+		amount		[vector!]
+		nonce		[integer!]
+		/local tx
+	][
+		either token-contract [
+			tx: reduce [
+				nonce
+				gas-price
+				limit
+				debase/base token-contract 16			;-- to address
+				eth-api/eth-to-wei to-i256 0			;-- value
+				rejoin [								;-- data
+					#{a9059cbb}							;-- method ID
+					debase/base eth-api/pad64 copy skip to-addr 2 16
+					eth-api/pad64 i256-to-bin amount
+				]
+			]
+		][
+			tx: reduce [
+				nonce
+				gas-price
+				limit
+				debase/base skip to-addr 2 16			;-- to address
+				amount
+				#{}										;-- data
+			]
+		]
+
+		key/get-eth-signed-data current/path tx chain-id
+	]
+
+	do-sign-tx: func [face [object!] event [event!] /local nonce price-wei limit amount-wei res ids][
+		price-wei: try [string-to-i256 gas-price/text 9]
+		if error? price-wei [
+			unview
+			ui-base/show-error-dlg price-wei
+			reset-sign-button
+			exit
+		]
+		amount-wei: try [string-to-i256 amount-field/text 18]
+		if error? amount-wei [
+			unview
+			ui-base/show-error-dlg amount-wei
+			reset-sign-button
+			exit
+		]
+		limit: to-integer gas-limit/text
+
+		res: check-data addr-to/text price-wei limit amount-wei
+		case [
+			res = 'invalid-addr [addr-to/text: copy "Invalid address" exit]
+			res = 'insufficient-balance [amount-field/text: copy "Insufficient Balance" exit]
+			res = 'invalid-amount [amount-field/text: copy "Invalid amount" exit]
+		]
 
 		notify-user
 
-		limit: to-integer gas-limit/text										;-- gas limit
-		nonce: try [eth-api/get-nonce net-type network addr-from/text]		;-- nonce
-		if error? nonce [
+		if error? nonce: try [eth-api/get-nonce net-type network addr-from/text] [
 			unview
 			view/flags nonce-error-dlg 'modal
 			reset-sign-button
 			exit
 		]
 
-		either token-contract [
-			tx: reduce [
-				nonce
-				gas-price-wei
-				limit
-				debase/base token-contract 16			;-- to address
-				eth-api/eth-to-wei to-i256 0			;-- value
-				rejoin [								;-- data
-					#{a9059cbb}							;-- method ID
-					debase/base eth-api/pad64 copy skip addr-to/text 2 16
-					eth-api/pad64 i256-to-bin amount-wei
-				]
-			]
-		][
-			tx: reduce [
-				nonce
-				gas-price-wei
-				limit
-				debase/base skip addr-to/text 2 16		;-- to address
-				amount-wei
-				#{}										;-- data
-			]
-		]
-
-		signed-data: key/get-eth-signed-data current/path tx chain-id
+		signed-data: sign-transaction
+			addr-from/text
+			addr-to/text
+			price-wei
+			limit
+			amount-wei
+			nonce
 
 		either all [
 			signed-data
@@ -199,7 +234,7 @@ eth-ui: context [
 			info-price/text:	rejoin [gas-price/text " Gwei"]
 			info-limit/text:	gas-limit/text
 			info-fee/text:		rejoin [
-				form-i256/nopad mul256 gas-price-wei to-i256 limit 18 8
+				form-i256/nopad mul256 price-wei to-i256 limit 18 8
 				" Ether"
 			]
 			info-nonce/text: mold tx/1
