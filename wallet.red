@@ -362,8 +362,13 @@ wallet: context [
 			on-menu: func [face [object!] event [event!]][
 				switch event/picked [
 					copy	[copy-addr]
+					unless eth-ui/current/addr [
+						case [
+							ui-type = "ETH" [eth-ui/current/selected: face/selected]
+						]
+					]
 					batch	[
-						eth-batch/open-batch-ui eth-ui/current/addr
+						eth-batch/open-batch-ui eth-ui/current/addr eth-ui/current/balance eth-ui/current/path
 					]
 				]
 			]

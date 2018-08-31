@@ -106,12 +106,13 @@ eth-ui: context [
 	]
 
 	check-data: func [
+		balance			[vector!]
 		to-addr			[string!]
 		price-wei		[vector!]
 		limit			[integer!]
 		amount-wei		[vector!]
 		/local
-			amount balance sum
+			amount sum
 	][
 		unless all [
 			to-addr/1 = #"0"
@@ -125,7 +126,6 @@ eth-ui: context [
 			not negative256? price-wei
 			not negative256? amount-wei
 		][
-			balance: current/balance
 			sum: mul256 price-wei to-i256 limit
 			sum: add256 sum amount-wei
 			unless lesser-or-equal256? sum balance [
@@ -153,6 +153,7 @@ eth-ui: context [
 		gas-limit	[integer!]
 		amount		[vector!]
 		nonce		[integer!]
+		path		[block!]
 		/local tx
 	][
 		either token-contract [
@@ -179,7 +180,7 @@ eth-ui: context [
 			]
 		]
 
-		key/get-eth-signed-data current/path tx chain-id
+		key/get-eth-signed-data path tx chain-id
 	]
 
 	do-sign-tx: func [face [object!] event [event!] /local nonce price-wei limit amount-wei res ids][
@@ -197,7 +198,7 @@ eth-ui: context [
 		]
 		limit: to-integer gas-limit/text
 
-		res: check-data addr-to/text price-wei limit amount-wei
+		res: check-data current/balance addr-to/text price-wei limit amount-wei
 		case [
 			res = 'invalid-addr [addr-to/text: copy "Invalid address" exit]
 			res = 'insufficient-balance [amount-field/text: copy "Insufficient Balance" exit]
@@ -220,6 +221,7 @@ eth-ui: context [
 			limit
 			amount-wei
 			nonce
+			current/path
 
 		either all [
 			signed-data

@@ -34,6 +34,9 @@ eth-batch: context [
 	gas-limit: none
 	signed-data: none
 
+	total-balance: none
+	from-path: none
+
 	sanitize-payments: func [data [block! none!] /local entry c][
 		if block? data [
 			foreach entry data [
@@ -93,7 +96,7 @@ eth-batch: context [
 		clear batch-results
 		payment-stop?: no
 		batch-result-btn/visible?: no
-		from-addr: copy eth-ui/current/addr
+		from-addr: batch-addr-from/text
 
 		if error? price-wei: try [string-to-i256 batch-gas-price/text 9] [
 			unview
@@ -122,11 +125,11 @@ eth-batch: context [
 				ui-base/show-error-dlg amount-wei
 				exit
 			]
-			;if 'ok <> res: eth-ui/check-data to-addr price-wei limit amount-wei [
-			;	unview
-			;	ui-base/show-error-dlg res
-			;	exit
-			;]
+			if 'ok <> res: eth-ui/check-data total-balance to-addr price-wei limit amount-wei [
+				unview
+				ui-base/show-error-dlg res
+				exit
+			]
 
 			signed-data: eth-ui/sign-transaction
 				from-addr
@@ -135,6 +138,7 @@ eth-batch: context [
 				limit
 				amount-wei
 				nonce
+				from-path
 
 			if payment-stop? [break]
 
@@ -142,7 +146,7 @@ eth-batch: context [
 				signed-data
 				binary? signed-data
 			][
-				result: eth-api/publish-tx net-type network signed-data
+				result: try [eth-api/publish-tx net-type network signed-data]
 				append batch-results result
 				either string? result [nonce: nonce + 1 "  √"]["  ×"]
 			][
@@ -208,8 +212,10 @@ eth-batch: context [
 		]
 	]
 
-	open-batch-ui: func [addr [string!] /local price-wei][
+	open-batch-ui: func [addr [string!] balance [vector!] path [block!] /local price-wei][
 		batch-addr-from/text: copy addr
+		total-balance: balance
+		from-path: path
 		gas-limit: either token-contract ["79510"]["21000"]
 		if all [not error? price-wei: try [eth-api/get-gas-price 'standard] price-wei][
 			batch-gas-price/text: form-i256/nopad price-wei 9 2
