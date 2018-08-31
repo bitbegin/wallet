@@ -13,164 +13,206 @@ Red [
 	}
 ]
 
+#if error? try [_wallet_red_][
+#do [_wallet_red_: yes]
+#include %config.red
+#include %keys/keys.red
+#include %libs/eth-api.red
 #include %libs/int256.red
-#include %libs/JSON.red
-#include %libs/ethereum.red
-#include %libs/HID/hidapi.red
-#include %keys/Ledger/ledger.red
+#include %libs/int-encode.red
+#include %ui-base.red
+#include %eth-ui.red
+
 
 #system [
 	with gui [#include %libs/usb-monitor.reds]
 ]
 
 wallet: context [
-
-	list-font: make font! [name: get 'font-fixed size: 11]
-
-	signed-data: addr-list: min-size: none
-	addr-per-page: 5
-
-	networks: [
-		https://eth.red-lang.org/mainnet
-		https://eth.red-lang.org/rinkeby
-		https://eth.red-lang.org/kovan
-		https://eth.red-lang.org/ropsten
-	]
-
-	explorers: [
-		https://etherscan.io/tx/
-		https://rinkeby.etherscan.io/tx/
-		https://kovan.etherscan.io/tx/
-		https://ropsten.etherscan.io/tx/
-	]
-
-	contracts: [
-		"ETH" [
-			"mainnet" #[none]
-			"Rinkeby" #[none]
-			"Kovan"	  #[none]
-			"Ropsten" #[none]
-		]
-		"RED" [
-			"mainnet" "76960Dccd5a1fe799F7c29bE9F19ceB4627aEb2f"
-			"Rinkeby" "43df37f66b8b9fececcc3031c9c1d2511db17c42"
-		]
-	]
-
-	explorer:	explorers/1
-	network:	networks/1
-	net-name:	"mainnet"
-	token-name: "ETH"
-	token-contract: none
-
+	list-font:		make font! [name: get 'font-fixed size: 11]
+	addr-per-page:	5
+	min-size:		none
 	connected?:		no
-	address-index:	0
 	page:			0
 
-	process-events: does [loop 10 [do-events/no-wait]]
-	
-	form-amount: func [value [float!]][
-		pos: find value: form value #"."
-		head insert/dup value #" " 8 - ((index? pos) - 1)
+	;- layout item defined as local
+	dev-list: none
+	btn-send: none
+	token-list: none
+	net-list: none
+	btn-reload: none
+	addr-list: none
+	info-msg: none
+	page-info: none
+	btn-prev: none
+	btn-more: none
+
+
+	enumerate: func [/list devs [block!] /local len] [
+		either list [key/current/devices: devs][
+			key/current/devices: key/enumerate
+		]
+		if dev-list/selected > key/current/count [dev-list/selected: key/current/count]
+		key/current/selected: dev-list/selected
+		dev-list/data: key/current/name-list
+
+		addr-list/data: []
 	]
 
-	list-addresses: func [/prev /next /local addresses addr n][
-		update-ui no
-		either ledger/connect [
-			usb-device/rate: none
-			connected?: yes
-			dev/text: "Ledger Nano S"
-			process-events
 
-			addresses: clear []
+	update-ui: func [enabled? [logic!]][
+		btn-send/enabled?: to-logic all [enabled? addr-list/selected addr-list/selected > 0]
+		if page > 0 [btn-prev/enabled?: enabled?]
+		foreach f [btn-more net-list token-list page-info btn-reload][
+			set in get f 'enabled? enabled?
+		]
+		process-events
+	]
+
+	connect: has [res][
+		usb-device/rate: none
+		update-ui no
+		if device-name = key/no-dev [
+			info-msg/text: "Please plug in your key..."
+			exit
+		]
+		if any [error? res: try [key/open] res = none][
+			info-msg/text: "open the key failed..."
+			exit
+		]
+
+		if error? res: try [key/init unit-name][
+			info-msg/text: "Initialize the key failed..."
+			exit
+		]
+		if res <> 'success [
+			info-msg/text: case [
+				res = 'browser-support-on [{Open the Ethereum app, ensure "Browser support" is "No".}]
+				res = 'locked [{Please unlock your Ledger key}]
+				;-- plug app and unknown all show 'please open app'
+				true [
+					case [
+						any [unit-name = "ETH" unit-name = "RED"][{Please open the Ethereum app}]
+						true [form [{unknow unit-name: } unit-name]]
+					]
+				]
+			]
+			exit
+		]
+		if 'DeviceError = key/request-pin [
+			info-msg/text: "Unlock the key failed..."
+			exit
+		]
+		usb-device/rate: 0:0:1
+		connected?: yes
+	]
+
+	list-addresses: func [
+		/prev /next 
+		/local
+			n
+			res
+	][
+		update-ui no
+
+		if connected? [
+			if 'DeviceError = key/get-request-pin-state [
+				info-msg/text: "Unlock the key failed..."
+				exit
+			]
+			if 'HasRequested <> key/get-request-pin-state [
+				exit
+			]
+			usb-device/rate: none
+
+			info-msg/text: "Please wait while loading addresses..."
+
 			if next [page: page + 1]
 			if prev [page: page - 1]
 			n: page * addr-per-page
-			
-			loop addr-per-page [
-				addr: ledger/get-address n
-				either string? addr [
-					info-msg/text: "Please wait while loading addresses..."
-				][
-					info-msg/text: case [
-						addr = 'browser-support-on [{Please set "Browser support" to "No"}]
-						addr = 'locked [
-							usb-device/rate: 0:0:3
-							"Please unlock your key"
+
+			case [
+				ui-type = "ETH" [
+					eth-ui/current/infos: []
+					eth-ui/current/selected: none
+					clear eth-ui/addr-infos
+					clear eth-ui/addresses
+					addr-list/data: eth-ui/addresses
+					loop addr-per-page [
+						res: eth-ui/enum-address n
+						case [
+							error? res [
+								info-msg/text: rejoin ["get address for " n " failed"]
+								update-ui yes
+								ui-base/show-error-dlg res
+							]
+							res = 'browser-support-on [info-msg/text: {Please set "Browser support" to "No"}]
+							res = 'locked [info-msg/text: "Please unlock your key"]
 						]
-						true [{Please open the "Ethereum" application}]
+						if res <> 'success [exit]
+						process-events
+						n: n + 1
 					]
-					exit
 				]
-				append addresses rejoin [addr "      <loading>"]
-				addr-list/data: addresses
-				process-events
-				n: n + 1
 			]
-			info-msg/text: "Please wait while loading balances..."
-			update-ui no
-			either error? try [
-				foreach address addr-list/data [
-					addr: copy/part address find address space
-					replace address "   <loading>" form-amount either token-contract [
-						eth/get-balance-token network token-contract addr
-					][
-						eth/get-balance network addr
+
+			case [
+				ui-type = "ETH" [
+					info-msg/text: "Please wait while loading balances..."
+					res: eth-ui/enum-address-info
+					case [
+						error? res [
+							info-msg/text: {Fetch balance: Timeout. Please try "Reload" again}
+							update-ui yes
+							ui-base/show-error-dlg res
+							exit
+						]
+						res = 'success [info-msg/text: ""]
 					]
-					process-events
+					eth-ui/current/infos: eth-ui/addr-infos
 				]
-			][
-				info-msg/text: {Fetch balance: Timeout. Please try "Reload" again}
-			][
-				info-msg/text: ""
 			]
 			update-ui yes
 			do-auto-size addr-list
+		]
+	]
+
+	do-select-dev: func [face [object!] event [event!]][
+		if key/opened? [key/close]
+		connected?: no
+		face/selected: select-device face/selected
+		connect
+		list-addresses
+	]
+
+	do-select-network: func [face [object!] event [event!] /local last-unit][
+		last-unit: unit-name
+		face/selected: select-net face/selected
+		unless any [
+			all [last-unit = "RED" unit-name = "ETH"]
+			all [last-unit = "ETH" unit-name = "RED"]
 		][
-			dev/text: "<No Device>"
+			key/close
+			connected?: no
+			enumerate
+			connect
 		]
-	]
-
-	reset-sign-button: does [
-		btn-sign/enabled?: yes
-		btn-sign/offset/x: 215
-		btn-sign/size/x: 60
-		btn-sign/text: "Sign"
-	]
-
-	do-send: func [face [object!] event [event!]][
-		if addr-list/data [
-			if addr-list/selected = -1 [addr-list/selected: 1]
-			network-to/text: net-name
-			addr-from/text: copy/part pick addr-list/data addr-list/selected 42
-			gas-limit/text: either token-contract ["79510"]["21000"]
-			reset-sign-button
-			label-unit/text: token-name
-			clear addr-to/text
-			clear amount-field/text
-			view/flags send-dialog 'modal
-		]
-	]
-
-	do-select-network: func [face [object!] event [event!] /local idx][
-		idx: face/selected
-		
-		net-name: face/data/:idx
-		network:  networks/:idx
-		explorer: explorers/:idx
-		token-contract: contracts/:token-name/:net-name
 		do-reload
 	]
 
-	do-select-token: func [face [object!] event [event!] /local idx net][
-		idx: face/selected
-		net: net-list/selected
-		token-name: face/data/:idx
-
-		net-list/data: extract contracts/:token-name 2
-		net: net-list/selected: either net > length? net-list/data [1][net]
-		net-name: net-list/data/:net
-		token-contract: contracts/:token-name/:net-name
+	do-select-token: func [face [object!] event [event!] /local last-unit][
+		last-unit: unit-name
+		face/selected: select-token face/selected
+		net-list/selected: select-net net-list/selected
+		unless any [
+			all [last-unit = "RED" unit-name = "ETH"]
+			all [last-unit = "ETH" unit-name = "RED"]
+		][
+			key/close
+			connected?: no
+			enumerate
+			connect
+		]
 		do-reload
 	]
 	
@@ -197,140 +239,10 @@ wallet: context [
 		ui/size: ui/size + delta + 8x10					;-- triggers a resizing event
 	]
 
-	check-data: func [/local addr amount balance][
-		addr: trim any [addr-to/text ""]
-		unless all [
-			addr/1 = #"0"
-			addr/2 = #"x"
-			42 = length? addr
-			debase/base skip addr 2 16
-		][
-			addr-to/text: copy "Invalid address"
-			return no
-		]
-		amount: attempt [to float! amount-field/text]
-		either all [amount amount > 0.0][
-			balance: to float! skip pick addr-list/data addr-list/selected 42
-			if amount > balance [
-				amount-field/text: copy "Insufficient Balance"
-				return no
-			]
-		][
-			amount-field/text: copy "Invalid amount"
-			return no
-		]
-		yes
-	]
-
-	update-ui: function [enabled? [logic!]][
-		btn-send/enabled?: to-logic all [enabled? addr-list/selected addr-list/selected > 0]
-		if page > 0 [btn-prev/enabled?: enabled?]
-		foreach f [btn-more net-list token-list page-info btn-reload][
-			set in get f 'enabled? enabled?
-		]
-		process-events
-	]
-
-	notify-user: does [
-		btn-sign/enabled?: no
-		process-events
-		btn-sign/offset/x: 133
-		btn-sign/size/x: 225
-		btn-sign/text: "Confirm the transaction on your Ledger"
-		process-events
-	]
-
-	do-sign-tx: func [face [object!] event [event!] /local tx nonce price limit amount][
-		unless check-data [exit]
-
-		notify-user
-
-		price: eth/gwei-to-wei gas-price/text			;-- gas price
-		limit: to-integer gas-limit/text				;-- gas limit
-		amount: eth/eth-to-wei amount-field/text		;-- send amount
-		nonce: eth/get-nonce network addr-from/text		;-- nonce
-		if nonce = -1 [
-			unview
-			view/flags nonce-error-dlg 'modal
-			reset-sign-button
-			exit
-		]
-
-		;-- Edge case: ledger key may locked in this moment
-		unless string? ledger/get-address 0 [
-			reset-sign-button
-			view/flags unlock-dev-dlg 'modal
-			exit
-		]
-
-		either token-contract [
-			tx: reduce [
-				nonce
-				price
-				limit
-				debase/base token-contract 16			;-- to address
-				eth/eth-to-wei 0						;-- value
-				rejoin [								;-- data
-					#{a9059cbb}							;-- method ID
-					debase/base eth/pad64 copy skip addr-to/text 2 16
-					eth/pad64 i256-to-bin amount
-				]
-			]
-		][
-			tx: reduce [
-				nonce
-				price
-				limit
-				debase/base skip addr-to/text 2 16		;-- to address
-				amount
-				#{}										;-- data
-			]
-		]
-
-		signed-data: ledger/get-signed-data address-index tx
-
-		either all [
-			signed-data
-			binary? signed-data
-		][
-			info-from/text:		addr-from/text
-			info-to/text:		copy addr-to/text
-			info-amount/text:	rejoin [amount-field/text " " token-name]
-			info-network/text:	net-name
-			info-price/text:	rejoin [gas-price/text " Gwei"]
-			info-limit/text:	gas-limit/text
-			info-fee/text:		rejoin [
-				mold (to float! gas-price/text) * (to float! gas-limit/text) / 1e9
-				" Ether"
-			]
-			info-nonce/text: mold tx/1
-			unview
-			view/flags confirm-sheet 'modal
-		][
-			if signed-data = 'token-error [
-				unview
-				view/flags contract-data-dlg 'modal
-			]
-			reset-sign-button
-		]
-	]
-
-	do-confirm: func [face [object!] event [event!] /local result][
-		result: eth/call-rpc network 'eth_sendRawTransaction reduce [
-			rejoin ["0x" enbase/base signed-data 16]
-		]
-		unview
-		either string? result [
-			browse rejoin [explorer result]
-		][							;-- error
-			tx-error/text: rejoin ["Error! Please try again^/^/" form result]
-			view/flags tx-error-dlg 'modal
-		]
-	]
-
-	copy-addr: func [][
+	copy-addr: func [/local addr][
 		if btn-send/enabled? [
-			write-clipboard copy/part pick addr-list/data addr-list/selected 42
+			addr: pick addr-list/data addr-list/selected 
+			write-clipboard copy/part addr find addr space
 		]
 	]
 
@@ -351,47 +263,25 @@ wallet: context [
 		list-addresses/prev
 	]
 	
-	do-page: func [face event][	
+	do-page: func [face event][
 		page: (to-integer pick face/data face/selected) - 1
 		if zero? page [btn-prev/enabled?: no]
 		list-addresses
 	]
 
-	send-dialog: layout [
-		title "Send Ether & Tokens"
-		style label: text  100 middle
-		style lbl:   text  360 middle font [name: font-fixed size: 10]
-		style field: field 360 font [name: font-fixed size: 10]
-		label "Network:"		network-to:	  lbl return
-		label "From Address:"	addr-from:	  lbl return
-		label "To Address:"		addr-to:	  field return
-		label "Amount to Send:" amount-field: field 120 label-unit: label 50 return
-		label "Gas Price:"		gas-price:	  field 120 "21" return
-		label "Gas Limit:"		gas-limit:	  field 120 "21000" return
-		pad 215x10 btn-sign: button 60 "Sign" :do-sign-tx
-	]
-
-	confirm-sheet: layout [
-		title "Confirm Transaction"
-		style label: text 120 right bold 
-		style info: text 330 middle font [name: font-fixed size: 10]
-		label "From Address:" 	info-from:    info return
-		label "To Address:" 	info-to: 	  info return
-		label "Amount to Send:" info-amount:  info return
-		label "Network:"		info-network: info return
-		label "Gas Price:" 		info-price:	  info return
-		label "Gas Limit:" 		info-limit:	  info return
-		label "Max TX Fee:" 	info-fee:	  info return
-		label "Nonce:"			info-nonce:	  info return
-		pad 164x10 button "Cancel" [signed-data: none unview] button "Send" :do-confirm
+	do-send: func [face [object!] event [event!]][
+		case [
+			ui-type = "ETH" [eth-ui/do-send face event]
+		]
 	]
 
 	ui: layout compose [
 		title "RED Wallet"
-		text 50 "Device:" dev: text 135 "<No Device>"
+		text 50 "Device:"
+		dev-list: drop-list data key/current/name-list 135 select key/current/selected :do-select-dev
 		btn-send: button "Send" :do-send disabled
-		token-list: drop-list data ["ETH" "RED"] 60 select 1 :do-select-token
-		net-list:   drop-list data ["mainnet" "rinkeby" "kovan" "ropsten"] select 1 :do-select-network
+		token-list: drop-list data token-config/current/token-names 60 select token-config/current/token-selected :do-select-token
+		net-list:   drop-list data token-config/current/net-names select token-config/current/net-selected :do-select-network
 		btn-reload: button "Reload" :do-reload disabled
 		return
 		
@@ -399,7 +289,7 @@ wallet: context [
 		text bold "Balances" right return pad 0x-10
 		
 		addr-list: text-list font list-font 520x100 return middle
-		
+
 		info-msg: text 285x20
 		text right 50 "Page:" tight
 		page-info: drop-list 40 
@@ -410,64 +300,46 @@ wallet: context [
 		btn-more: button "More" :do-more-addr
 	]
 
-	unlock-dev-dlg: layout [
-		title "Unlock your key"
-		text font-size 12 {Unlock your Ledger key, open the Ethereum app, ensure "Browser support" is "No".}
-		return
-		pad 262x10 button "OK" [unview]
-	]
-
-	contract-data-dlg: layout [
-		title "Set Contract data to YES"
-		text font-size 12 {Please set "Contract data" to "Yes" in the Ethereum app's settings.}
-		return
-		pad 180x10 button "OK" [unview]
-	]
-
-	nonce-error-dlg: layout [
-		title "Cannot get nonce"
-		text font-size 12 {Cannot get nonce, please try again.}
-		return
-		pad 110x10 button "OK" [unview]
-	]
-
-	tx-error-dlg: layout [
-		title "Send Transaction Error"
-		tx-error: area 400x200
-	]
-
-	support-device?: func [
-		vendor-id	[integer!]
-		product-id	[integer!]
-		return:		[logic!]
-	][
-		all [
-			vendor-id = ledger/vendor-id
-			product-id = ledger/product-id
-		]
-	]
-
 	monitor-devices: does [
 		append ui/pane usb-device: make face! [
 			type: 'usb-device offset: 0x0 size: 10x10 rate: 0:0:1
 			actors: object [
-				on-up: func [face [object!] event [event!]][
-					if support-device? face/data/1 face/data/2 [
-						list-addresses
+				on-up: func [face [object!] event [event!] /local id [integer!] devs [block!]][
+					id: face/data/2 << 16 or face/data/1
+					if key/support? id [
+						;-- print "on-up"
+						if key/current/devices <> devs: key/enumerate [
+							enumerate/list devs
+							if key/opened? [key/close]
+							connected?: no
+							connect
+							list-addresses
+						]
 					]
 				]
-				on-down: func [face [object!] event [event!]][
-					if support-device? face/data/1 face/data/2 [
-						face/rate: none
-						connected?: no
-						ledger/close
-						dev/text: "<No Device>"
-						info-msg/text: ""
-						clear addr-list/data
+				on-down: func [face [object!] event [event!] /local id [integer!] devs [block!]][
+					id: face/data/2 << 16 or face/data/1
+					if key/support? id [
+						;-- print "on-down"
+						if key/current/devices <> devs: key/enumerate [
+							enumerate/list devs
+							if key/opened? [key/close]
+							connected?: no
+							connect
+							list-addresses
+						]
 					]
 				]
 				on-time: func [face event][
-					if connected? [face/rate: none]
+					;-- print "on-time"
+					if key/opened? [
+						if 'Requesting = key/get-request-pin-state [exit]
+						if 'HasRequested = key/get-request-pin-state [list-addresses exit]
+					]
+					if key/opened? [key/close]
+					connected?: no
+					enumerate
+					connect
 					list-addresses
 				]
 			]
@@ -477,7 +349,7 @@ wallet: context [
 	setup-actors: does [
 		ui/actors: context [
 			on-close: func [face event][
-				ledger/close
+				if key/opened? [key/close] connected?: no
 			]
 			on-resizing: function [face event] [
 				if any [event/offset/x < min-size/x event/offset/y < min-size/y][exit]
@@ -493,8 +365,10 @@ wallet: context [
 				]
 			]
 			on-change: func [face event][
-				address-index: page * addr-per-page + face/selected - 1
 				btn-send/enabled?: to-logic face/selected
+				case [
+					ui-type = "ETH" [eth-ui/current/selected: face/selected]
+				]
 			]
 		]
 
@@ -513,3 +387,5 @@ wallet: context [
 ]
 
 wallet/run
+
+]
