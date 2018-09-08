@@ -13,7 +13,6 @@ Red [
 #include %libs/eth-api.red
 #include %libs/int256.red
 #include %libs/int-encode.red
-#include %ui-base.red
 
 eth-ui: context [
 
@@ -186,13 +185,13 @@ eth-ui: context [
 	do-sign-tx: func [face [object!] event [event!] /local nonce price-wei limit amount-wei res ids][
 		if error? price-wei: try [string-to-i256 gas-price/text 9] [
 			unview
-			ui-base/show-error-dlg price-wei
+			show-error-dlg price-wei
 			reset-sign-button
 			exit
 		]
 		if error? amount-wei: try [string-to-i256 amount-field/text 18] [
 			unview
-			ui-base/show-error-dlg amount-wei
+			show-error-dlg amount-wei
 			reset-sign-button
 			exit
 		]
@@ -257,7 +256,7 @@ eth-ui: context [
 		either string? result [
 			browse rejoin [explorer result]
 		][
-			ui-base/show-error-dlg result
+			show-error-dlg result
 		]
 	]
 
@@ -277,7 +276,7 @@ eth-ui: context [
 
 	confirm-sheet: layout [
 		title "Confirm Transaction"
-		style label: text 120 right bold 
+		style label: text 120 right bold
 		style info: text 330 middle font [name: font-fixed size: 10]
 		label "From Address:" 	info-from:    info return
 		label "To Address:" 	info-to: 	  info return
@@ -302,6 +301,21 @@ eth-ui: context [
 		text font-size 12 {Please set "Contract data" to "Yes" in the Ethereum app's settings.}
 		return
 		pad 180x10 button "OK" [unview]
+	]
+
+	set 'process-events does [loop 10 [do-events/no-wait]]
+	list-font:		make font! [name: get 'font-fixed size: 11]
+
+	tx-error: none
+
+	tx-error-dlg: layout [
+		title "Send Transaction Error"
+		tx-error: area 400x200
+	]
+
+	show-error-dlg: func [e][
+		tx-error/text: form e
+		view/flags tx-error-dlg 'modal
 	]
 
 ]

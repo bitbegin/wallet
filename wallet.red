@@ -21,7 +21,6 @@ Red [
 #include %libs/eth-api.red
 #include %libs/int256.red
 #include %libs/int-encode.red
-#include %ui-base.red
 #include %eth-ui.red
 #include %eth-batch.red
 
@@ -108,7 +107,7 @@ wallet: context [
 	]
 
 	list-addresses: func [
-		/prev /next 
+		/prev /next
 		/local
 			n
 			res
@@ -144,7 +143,7 @@ wallet: context [
 							error? res [
 								info-msg/text: rejoin ["get address for " n " failed"]
 								update-ui yes
-								ui-base/show-error-dlg res
+								eth-ui/show-error-dlg res
 							]
 							res = 'browser-support-on [info-msg/text: {Please set "Browser support" to "No"}]
 							res = 'locked [info-msg/text: "Please unlock your key"]
@@ -164,7 +163,7 @@ wallet: context [
 						error? res [
 							info-msg/text: {Fetch balance: Timeout. Please try "Reload" again}
 							update-ui yes
-							ui-base/show-error-dlg res
+							eth-ui/show-error-dlg res
 							exit
 						]
 						res = 'success [info-msg/text: ""]
@@ -215,9 +214,9 @@ wallet: context [
 		]
 		do-reload
 	]
-	
+
 	do-reload: does [if connected? [list-addresses]]
-	
+
 	do-resize: function [delta [pair!]][
 		ref: as-pair btn-send/offset/x - 10 ui/extra/y / 2
 		foreach-face ui [
@@ -230,7 +229,7 @@ wallet: context [
 		]
 		addr-list/size: addr-list/size + delta
 	]
-	
+
 	do-auto-size: function [face [object!]][
 		size: size-text/with face "X"
 		cols: 64
@@ -241,7 +240,7 @@ wallet: context [
 
 	copy-addr: func [/local addr][
 		if btn-send/enabled? [
-			addr: pick addr-list/data addr-list/selected 
+			addr: pick addr-list/data addr-list/selected
 			write-clipboard copy/part addr find addr space
 		]
 	]
@@ -262,7 +261,7 @@ wallet: context [
 		page-info/selected: page
 		list-addresses/prev
 	]
-	
+
 	do-page: func [face event][
 		page: (to-integer pick face/data face/selected) - 1
 		if zero? page [btn-prev/enabled?: no]
@@ -284,19 +283,19 @@ wallet: context [
 		net-list:   drop-list data token-config/current/net-names select token-config/current/net-selected :do-select-network
 		btn-reload: button "Reload" :do-reload disabled
 		return
-		
-		text bold "My Addresses" pad 280x0 
+
+		text bold "My Addresses" pad 280x0
 		text bold "Balances" right return pad 0x-10
-		
-		addr-list: text-list font ui-base/list-font 520x100 return middle
+
+		addr-list: text-list font eth-ui/list-font 520x100 return middle
 
 		info-msg: text 285x20
 		text right 50 "Page:" tight
-		page-info: drop-list 40 
+		page-info: drop-list 40
 			data collect [repeat p 10 [keep form p]]
 			select (page + 1)
 			:do-page
-		btn-prev: button "Prev" disabled :do-prev-addr 
+		btn-prev: button "Prev" disabled :do-prev-addr
 		btn-more: button "More" :do-more-addr
 	]
 

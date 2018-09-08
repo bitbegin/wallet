@@ -16,7 +16,6 @@ Red [
 #include %libs/eth-api.red
 #include %libs/int256.red
 #include %libs/int-encode.red
-#include %ui-base.red
 #include %eth-ui.red
 
 eth-batch: context [
@@ -79,7 +78,7 @@ eth-batch: context [
 			either string? result [
 				browse rejoin [explorer result]
 			][							;-- error
-				ui-base/show-error-dlg result
+				eth-ui/show-error-dlg result
 			]
 		]
 	]
@@ -100,7 +99,7 @@ eth-batch: context [
 
 		if error? price-wei: try [string-to-i256 batch-gas-price/text 9] [
 			unview
-			ui-base/show-error-dlg price-wei
+			eth-ui/show-error-dlg price-wei
 			exit
 		]
 
@@ -122,12 +121,12 @@ eth-batch: context [
 			amount: trim copy skip addr 42
 			if error? amount-wei: try [string-to-i256 amount 18] [
 				unview
-				ui-base/show-error-dlg amount-wei
+				eth-ui/show-error-dlg amount-wei
 				exit
 			]
 			if 'ok <> res: eth-ui/check-data total-balance to-addr price-wei limit amount-wei [
 				unview
-				ui-base/show-error-dlg res
+				eth-ui/show-error-dlg res
 				exit
 			]
 
@@ -168,7 +167,7 @@ eth-batch: context [
 		text "Account:" batch-addr-from: lbl
 		text "Gas Price:"  batch-gas-price: field 48 "21" return
 
-		payment-list: text-list font ui-base/list-font data [] 600x400 below
+		payment-list: text-list font eth-ui/list-font data [] 600x400 below
 		button "Add"	[
 			add-payment-dialog/text: "Add payment"
 			add-payment-btn/text: "Add"
