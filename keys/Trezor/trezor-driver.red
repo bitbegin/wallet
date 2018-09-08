@@ -6,11 +6,6 @@ Red [
 	License: "BSD-3 - https://github.com/red/red/blob/master/BSD-3-License.txt"
 ]
 
-#if error? try [_trezor-driver_red_][
-#do [_trezor-driver_red_: yes]
-#include %../../libs/HID/hidapi.red
-#include %../../libs/int-encode.red
-
 trezor-driver: context [
 
 	system/catalog/errors/user: make system/catalog/errors/user [trezor-driver: ["trezor-driver [" :arg1 ": (" :arg2 " " :arg3 ")]"]]
@@ -37,7 +32,7 @@ trezor-driver: context [
 
 	close: does [
 		if dongle <> none [
-			hid/close dongle 
+			hid/close dongle
 			dongle: none
 		]
 	]
@@ -229,7 +224,5 @@ trezor-driver: context [
 
 		0
 	]
-
-]
 
 ]

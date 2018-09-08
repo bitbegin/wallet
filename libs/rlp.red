@@ -5,9 +5,6 @@ Red [
     Notes: "RLP Encoding based on: https://github.com/ethereum/wiki/wiki/%5BEnglish%5D-RLP"
 ]
 
-#if error? try [_rlp_red_][
-#do [_rlp_red_: yes]
-
 rlp: context [
 
 	encode-length: function [
@@ -45,6 +42,4 @@ rlp: context [
 			]
 		]
 	]
-]
-
 ]

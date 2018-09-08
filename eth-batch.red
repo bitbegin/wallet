@@ -9,15 +9,6 @@ Red [
 	}
 ]
 
-#if error? try [_eth-patch_red_][
-#do [_eth-patch_red_: yes]
-#include %config.red
-#include %keys/keys.red
-#include %libs/eth-api.red
-#include %libs/int256.red
-#include %libs/int-encode.red
-#include %eth-ui.red
-
 eth-batch: context [
 	payment-stop?: no
 	batch-results: make block! 4
@@ -221,7 +212,5 @@ eth-batch: context [
 		]
 		view batch-send-dialog
 	]
-
-]
 
 ]

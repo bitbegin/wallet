@@ -6,10 +6,6 @@ Red [
 	License: "BSD-3 - https://github.com/red/red/blob/master/BSD-3-License.txt"
 ]
 
-#if error? try [_int-encode_red_][
-#do [_int-encode_red_: yes]
-#include %int256.red
-
 to-bin8: func [v [integer! char!]][
 	to binary! to char! 256 + v and 255
 ]
@@ -91,9 +87,7 @@ form-i256: func [bigint [vector!] scalar [integer!] max-point [integer!] /nopad 
 	][
 		res: left
 	]
-	
+
 	if str/1 = #"-" [insert res #"-"]
 	res
-]
-
 ]

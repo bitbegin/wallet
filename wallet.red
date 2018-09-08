@@ -14,13 +14,20 @@ Red [
 	}
 ]
 
-#if error? try [_wallet_red_][
-#do [_wallet_red_: yes]
-#include %config.red
-#include %keys/keys.red
-#include %libs/eth-api.red
 #include %libs/int256.red
 #include %libs/int-encode.red
+#include %libs/JSON.red
+#include %libs/proto-encode.red
+#include %libs/HID/hidapi.red
+#include %libs/rlp.red
+#include %libs/eth-api.red
+#include %keys/Ledger/ledger.red
+#include %keys/Trezor/trezor-driver.red
+#include %keys/Trezor/trezor-message.red
+#include %keys/Trezor/trezor.red
+#include %keys/keys.red
+
+#include %config.red
 #include %eth-ui.red
 #include %eth-batch.red
 
@@ -397,5 +404,3 @@ wallet: context [
 ]
 
 wallet/run
-
-]

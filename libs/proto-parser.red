@@ -6,9 +6,6 @@ Red [
 	License: "BSD-3 - https://github.com/red/red/blob/master/BSD-3-License.txt"
 ]
 
-#if error? try [_proto-parser_red_][
-#do [_proto-parser_red_: yes]
-
 proto-parser: context [
 
 	system/catalog/errors/user: make system/catalog/errors/user [proto-parser: ["proto-parser [" :arg1 ": (" :arg2 " " :arg3 ")]"]]
@@ -41,8 +38,8 @@ proto-parser: context [
 			copy type to [any space "{"] [any space "{"] (clear items)
 			any [
 				[any space "}" break] |
-				[any space 
-					copy name to [any space "="] [any space "="] any space 
+				[any space
+					copy name to [any space "="] [any space "="] any space
 					copy number to [[any space "[" to ";"] | [any space ";"]] thru ";"
 					(append/only items reduce [to integer! number to word! name])
 				]
@@ -55,8 +52,8 @@ proto-parser: context [
 			any [
 				[any space "}" break] |
 				[any space "reserved" some space thru ";"] |
-				[any space 
-					copy tags to [any space "="] [any space "="] any space 
+				[any space
+					copy tags to [any space "="] [any space "="] any space
 					copy number to [[any space "[" to ";"] | [any space ";"]] thru ";"
 					(
 						tag: split tags space
@@ -135,6 +132,4 @@ proto-parser: context [
 		]
 		new-error 'get-msg "not found" msg
 	]
-]
-
 ]

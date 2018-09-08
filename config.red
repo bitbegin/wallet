@@ -6,9 +6,6 @@ Red [
 	License: "BSD-3 - https://github.com/red/red/blob/master/BSD-3-License.txt"
 ]
 
-#if error? try [_config_red_][
-#do [_config_red_: yes]
-
 token-config: context [
 
 	;-- m / purpose' / coin_type' / account' / change / address_index
@@ -53,7 +50,7 @@ token-config: context [
 	_networks: []
 	_explorers: []
 	net-blk: none
-	
+
 	current: make reactor! [
 		token-names: extract token-table 2
 		token-count: is [length? token-names]
@@ -134,6 +131,4 @@ token-config: context [
 
 	select-token 1
 	select-net 2
-]
-
 ]

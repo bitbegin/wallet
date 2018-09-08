@@ -6,12 +6,6 @@ Red [
 	License: "BSD-3 - https://github.com/red/red/blob/master/BSD-3-License.txt"
 ]
 
-#if error? try [_ledger_red_][
-#do [_ledger_red_: yes]
-#include %../../libs/HID/hidapi.red
-#include %../../libs/int-encode.red
-#include %../../libs/rlp.red
-
 ledger: context [
 	name: "Ledger Nano S"
 
@@ -65,7 +59,7 @@ ledger: context [
 
 	close: does [
 		if dongle <> none [
-			hid/close dongle 
+			hid/close dongle
 			dongle: none
 		]
 	]
@@ -234,7 +228,5 @@ ledger: context [
 			rlp/encode tx
 		][signed]
 	]
-
-]
 
 ]

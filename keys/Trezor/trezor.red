@@ -7,15 +7,6 @@ Red [
 	License: "BSD-3 - https://github.com/red/red/blob/master/BSD-3-License.txt"
 ]
 
-#if error? try [_trezor_red_][
-#do [_trezor_red_: yes]
-#include %trezor-message.red
-#include %trezor-driver.red
-#include %../../libs/proto-encode.red
-#include %../../libs/int-encode.red
-#include %../../libs/rlp.red
-
-
 trezor: context [
 	name: "Trezor"
 
@@ -107,7 +98,7 @@ trezor: context [
 		encode-and-write pin-msg pin-req
 		trezor-driver/message-read clear command-buffer
 
-		if trezor-driver/msg-id = trezor-message/get-id 'EthereumAddress [ 
+		if trezor-driver/msg-id = trezor-message/get-id 'EthereumAddress [
 			return 'HasRequested
 		]
 		if trezor-driver/msg-id = trezor-message/get-id 'PinMatrixRequest [
@@ -402,7 +393,5 @@ trezor: context [
 			unview
 		]
 	]
-
-]
 
 ]

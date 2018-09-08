@@ -5,9 +5,6 @@ Red [
     License: "BSD-3 - https://github.com/red/red/blob/master/BSD-3-License.txt"
 ]
 
-#if error? try [_json_red_][
-#do [_json_red_: yes]
-
 json: context [
 	quoted-char: charset {"\/bfnrt}
 	exponent:	 charset "eE"
@@ -176,6 +173,4 @@ json: context [
 		encode-into data buffer
 		buffer
 	]
-]
-
 ]

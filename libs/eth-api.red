@@ -7,12 +7,6 @@ Red [
 	License: "BSD-3 - https://github.com/red/red/blob/master/BSD-3-License.txt"
 ]
 
-#if error? try [_eth-api_red_][
-#do [_eth-api_red_: yes]
-#include %JSON.red
-#include %int256.red
-#include %int-encode.red
-
 eth-api: context [
 
 	system/catalog/errors/user: make system/catalog/errors/user [eth-api: ["eth-api [" :arg1 ": (" :arg2 " " :arg3 ")]"]]
@@ -85,7 +79,7 @@ eth-api: context [
 	]
 
 	get-url: func [url [url!] return: [map!]
-		/local res 
+		/local res
 	][
 		if all [not error? res: try [read url] map? res: json/decode res][return res]
 
@@ -168,6 +162,4 @@ eth-api: context [
 			string-to-i256 res 9
 		][none]
 	]
-]
-
 ]

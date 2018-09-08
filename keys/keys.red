@@ -6,11 +6,6 @@ Red [
 	License: "BSD-3 - https://github.com/red/red/blob/master/BSD-3-License.txt"
 ]
 
-#if error? try [_keys_red_][
-#do [_keys_red_: yes]
-#include %Ledger/ledger.red
-#include %Trezor/trezor.red
-
 key: context [
 
 	system/catalog/errors/user: make system/catalog/errors/user [key: ["key [" :arg1 ": (" :arg2 " " :arg3 ")]"]]
@@ -214,7 +209,5 @@ key: context [
 			true [new-error 'get-eth-address "not found" device-name]
 		]
 	]
-
-]
 
 ]

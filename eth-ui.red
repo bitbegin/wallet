@@ -6,14 +6,6 @@ Red [
 	License: "BSD-3 - https://github.com/red/red/blob/master/BSD-3-License.txt"
 ]
 
-#if error? try [_eth-ui_red_][
-#do [_eth-ui_red_: yes]
-#include %config.red
-#include %keys/keys.red
-#include %libs/eth-api.red
-#include %libs/int256.red
-#include %libs/int-encode.red
-
 eth-ui: context [
 
 	addr-infos: []
@@ -317,7 +309,5 @@ eth-ui: context [
 		tx-error/text: form e
 		view/flags tx-error-dlg 'modal
 	]
-
-]
 
 ]

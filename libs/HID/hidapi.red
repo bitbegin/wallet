@@ -9,9 +9,6 @@ Red [
 	}
 ]
 
-#if error? try [_hidapi_red_][
-#do [_hidapi_red_: yes]
-
 #system [
 	#switch OS [
 		Windows  [#include %windows.reds]
@@ -128,6 +125,4 @@ hid: context [
 	][
 		if dev/value <> 0 [hid/close as int-ptr! dev/value]
 	]
-]
-
 ]

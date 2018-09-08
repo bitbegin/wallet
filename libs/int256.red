@@ -10,9 +10,6 @@ Red [
 	}
 ]
 
-#if error? try [_int256_red_][
-#do [_int256_red_: yes]
-
 int256: context [
 
 	system/catalog/errors/user: make system/catalog/errors/user [int256: ["int256 [" :arg1 ": (" :arg2 " " :arg3 ")]"]]
@@ -96,7 +93,7 @@ int256: context [
 				return res
 			]
 		][new-error 'to-i256 "invalid type" type?/word value]
-		
+
 		make vector! compose/only [integer! 32 (spec)]
 	]
 
@@ -127,7 +124,7 @@ int256: context [
 			value: bigint
 		]
 		res: 0.0
-		p: 1.0 
+		p: 1.0
 		idx: 16
 		loop 16 [
 			v: value/:idx
@@ -235,7 +232,7 @@ int256: context [
 		if all [negative256? left not negative256? right][return yes]
 		if all [not negative256? left negative256? right][return no]
 		if all [not negative256? left not negative256? right][return less-equal? left right]
-		
+
 		not less-equal? negative256 left negative256 right
 	]
 
@@ -555,6 +552,4 @@ int256: context [
 	set 'mod256 func [l [vector!] r [vector!] return: [vector!]][
 		second div256/rem l r
 	]
-]
-
 ]
