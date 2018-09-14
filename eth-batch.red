@@ -53,7 +53,7 @@ eth-batch: context [
 		foreach entry payment-list/data [
 			payment-list/selected: idx
 			process-events
-			addr: find entry "0x"
+			addr: next find entry " 0x"
 			to-addr: copy/part addr 42
 			amount: trim copy skip addr 42
 			if error? amount-wei: try [string-to-i256 amount 18] [
@@ -70,7 +70,7 @@ eth-batch: context [
 
 	do-add-payment: func [face event /local entry res][
 		entry: rejoin [
-			pad copy/part payment-name/text 11 12
+			pad copy/part trim/all payment-name/text 11 12
 			payment-addr/text "        "
 			payment-amount/text
 		]
@@ -86,6 +86,7 @@ eth-batch: context [
 				remove at payment-list/data payment-list/selected
 			]
 			eth-ui/show-error-dlg res
+			batch-send-btn/text: "Send"
 		]
 		unview
 	]
@@ -145,7 +146,7 @@ eth-batch: context [
 		foreach entry payment-list/data [
 			payment-list/selected: idx
 			process-events
-			addr: find entry "0x"
+			addr: next find entry " 0x"
 			to-addr: copy/part addr 42
 			amount: trim copy skip addr 42
 			if error? amount-wei: try [string-to-i256 amount 18] [
@@ -198,13 +199,15 @@ eth-batch: context [
 			view/flags add-payment-dialog 'modal
 		]
 		button "Edit"	[
-			add-payment-dialog/text: "Edit payment"
-			entry: pick payment-list/data payment-list/selected
-			payment-name/text: copy/part entry find entry #" "
-			payment-addr/text: copy/part addr: find entry "0x" 42
-			payment-amount/text: trim copy skip addr 42
-			add-payment-btn/text: "OK"
-			view/flags add-payment-dialog 'modal
+			unless empty? payment-list/data [
+				add-payment-dialog/text: "Edit payment"
+				entry: pick payment-list/data payment-list/selected
+				payment-name/text: copy/part entry find entry #" "
+				payment-addr/text: copy/part addr: next find entry " 0x" 42
+				payment-amount/text: trim copy skip addr 42
+				add-payment-btn/text: "OK"
+				view/flags add-payment-dialog 'modal
+			]
 		]
 		button "Remove" [remove at payment-list/data payment-list/selected]
 		button "Import" :do-import-payments
