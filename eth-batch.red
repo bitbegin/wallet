@@ -70,7 +70,7 @@ eth-batch: context [
 
 	do-add-payment: func [face event /local entry res][
 		entry: rejoin [
-			pad copy payment-name/text 12
+			pad copy/part payment-name/text 11 12
 			payment-addr/text "        "
 			payment-amount/text
 		]
