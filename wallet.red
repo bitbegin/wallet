@@ -159,6 +159,7 @@ wallet: context [
 						process-events
 						n: n + 1
 					]
+					eth-ui/current/selected: addr-list/selected
 				]
 			]
 
@@ -366,13 +367,19 @@ wallet: context [
 
 		addr-list/actors: make object! [
 			on-menu: func [face [object!] event [event!]][
-				switch event/picked [
-					copy	[copy-addr]
-					unless eth-ui/current/addr [
-						case [
-							ui-type = "ETH" [eth-ui/current/selected: face/selected]
+				case [
+					ui-type = "ETH" [
+						if any [face/selected = none face/selected = -1] [
+							face/selected: 1
+							eth-ui/current/selected: face/selected
+						]
+						unless eth-ui/current/addr [
+							eth-ui/current/selected: face/selected
 						]
 					]
+				]
+				switch event/picked [
+					copy	[copy-addr]
 					batch	[
 						eth-batch/open-batch-ui eth-ui/current/addr eth-ui/current/balance eth-ui/current/path
 					]
