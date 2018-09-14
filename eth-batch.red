@@ -38,7 +38,37 @@ eth-batch: context [
 		data
 	]
 
-	do-add-payment: func [face event /local entry][
+	check-payment: func [return: [word!]
+		/local idx sum entry addr to-addr amount amount-wei price-wei limit
+	][
+		if error? price-wei: try [string-to-i256 batch-gas-price/text 9] [
+			return 'invalid-price
+		]
+
+		limit: to-integer gas-limit
+
+		batch-send-btn/text: "Stop"
+		idx: 1
+		sum: to-i256 0
+		foreach entry payment-list/data [
+			payment-list/selected: idx
+			process-events
+			addr: find entry "0x"
+			to-addr: copy/part addr 42
+			amount: trim copy skip addr 42
+			if error? amount-wei: try [string-to-i256 amount 18] [
+				return 'invalid-amount
+			]
+			sum: add256 sum amount-wei
+			if 'ok <> res: eth-ui/check-data total-balance to-addr price-wei limit sum [
+				return res
+			]
+		]
+		batch-send-btn/text: "Send"
+		return 'ok
+	]
+
+	do-add-payment: func [face event /local entry res][
 		entry: rejoin [
 			pad copy payment-name/text 12
 			payment-addr/text "        "
@@ -48,6 +78,14 @@ eth-batch: context [
 			append payment-list/data entry
 		][
 			poke payment-list/data payment-list/selected entry
+		]
+		if 'ok <> res: check-payment [
+			either add-payment-btn/text = "Add" [
+				remove back tail payment-list/data
+			][
+				remove at payment-list/data payment-list/selected
+			]
+			eth-ui/show-error-dlg res
 		]
 		unview
 	]
@@ -113,11 +151,6 @@ eth-batch: context [
 			if error? amount-wei: try [string-to-i256 amount 18] [
 				unview
 				eth-ui/show-error-dlg amount-wei
-				exit
-			]
-			if 'ok <> res: eth-ui/check-data total-balance to-addr price-wei limit amount-wei [
-				unview
-				eth-ui/show-error-dlg res
 				exit
 			]
 
