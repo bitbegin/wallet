@@ -186,7 +186,13 @@ qrcode: context [
 		part-str: enbase/base part-bin 2
 		if item-bits > part-len: length? part-str [return none]
 		begin: skip part-str part-len - item-bits
-		rejoin ["0001" copy/part begin item-bits bits "0000"]
+		res: rejoin ["0001" copy/part begin item-bits bits "0000"]
+		res-len: length? res
+		m: res-len % 8
+		if m <> 0 [
+			append/dup res "0" 8 - m
+		]
+		res
 	]
 
 	encode-alphanumber: function [str [string!] ver [integer!]][
@@ -219,10 +225,16 @@ qrcode: context [
 		part-str: enbase/base part-bin 2
 		if item-bits > part-len: length? part-str [return none]
 		begin: skip part-str part-len - item-bits
-		rejoin ["0010" copy/part begin item-bits bits "0000"]
+		res: rejoin ["0010" copy/part begin item-bits bits "0000"]
+		res-len: length? res
+		m: res-len % 8
+		if m <> 0 [
+			append/dup res "0" 8 - m
+		]
+		res
 	]
 ]
 
-print "000100000010000000001100010101100110000110000" = qrcode/encode-number "01234567" 1
-print "001000000010100111001110111001110010000100000" = qrcode/encode-alphanumber "AC-42" 1
-print "001000000101101100001011011110001101000101110010110111000100110101000011010000" = qrcode/encode-alphanumber "HELLO WORLD" 1
+print "000100000010000000001100010101100110000110000000" = qrcode/encode-number "01234567" 1
+print "001000000010100111001110111001110010000100000000" = qrcode/encode-alphanumber "AC-42" 1
+print "00100000010110110000101101111000110100010111001011011100010011010100001101000000" = qrcode/encode-alphanumber "HELLO WORLD" 1
