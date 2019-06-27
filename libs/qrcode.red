@@ -2,16 +2,20 @@ Red []
 
 qrcode: context [
 	mode-indicators: [
-		terminator		#{0000}
-		fnc1-first		#{0101}
-		fnc1-second		#{1001}
-		struct			#{0011}
-		kanji			#{1000}
-		byte			#{0100}
-		alphanumber		#{0010}
-		number			#{0001}
-		eci				#{0111}
-		chinese			#{1101}
+		terminator		{0000}
+		fnc1-first		{0101}
+		fnc1-second		{1001}
+		struct			{0011}
+		kanji			{1000}
+		byte			{0100}
+		alphanumber		{0010}
+		number			{0001}
+		eci				{0111}
+		chinese			{1101}
+	]
+	padding-bin: [
+		{11101100}
+		{00010001}
 	]
 	version-base: 21x21
 	version-step: 4x4
@@ -27,6 +31,20 @@ qrcode: context [
 		M	15%
 		Q	25%
 		H	30%
+	]
+
+	ECC_CODEWORDS_PER_BLOCK: [
+		L	[ 7 10 15 20 26 18 20 24 30 18 20 24 26 30 22 24 28 30 28 28 28 28 30 30 26 28 30 30 30 30 30 30 30 30 30 30 30 30 30 30]
+		M	[10 16 26 18 24 16 18 22 22 26 30 22 22 24 24 28 28 26 26 26 26 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28]
+		Q	[13 22 18 26 18 24 18 22 20 24 28 26 24 20 30 24 28 28 26 30 28 30 30 30 30 28 30 30 30 30 30 30 30 30 30 30 30 30 30 30]
+		H	[17 28 22 16 22 28 26 26 24 28 24 28 22 24 24 30 28 28 26 28 30 24 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30]
+	]
+
+	NUM_ERROR_CORRECTION_BLOCKS: [
+		L	[ 1  1  1  1  1  2  2  2  2  4  4  4  4  4  6  6  6  6  7  8  8  9  9 10 12 12 12 13 14 15 16 17 18 19 19 20 21 22 24 25]
+		M	[ 1  1  1  2  2  4  4  4  5  5  5  8  9  9 10 10 11 13 14 16 17 17 18 20 21 23 25 26 28 29 31 33 35 37 38 40 43 45 47 49]
+		Q	[ 1  1  2  2  4  4  6  6  8  8  8 10 12 16 12 17 16 18 21 20 23 23 25 27 29 34 34 35 38 40 43 45 48 51 53 56 59 62 65 68]
+		H	[ 1  1  2  4  4  4  5  6  8  8 11 11 16 16 18 16 19 21 25 25 25 34 30 32 35 37 40 42 45 48 51 54 57 60 63 66 70 74 77 81]
 	]
 
 	alphanumber: [
@@ -150,7 +168,27 @@ qrcode: context [
 		none
 	]
 
-	encode-number: function [str [string!] ver [integer!]][
+	get-data-modules-bits: function [ver [integer!]][
+		res: (16 * ver + 128) * ver + 64
+		if ver >= 2 [
+			align: ver / 7 + 2
+			res: res - ((25 * align - 10) * align - 55)
+			if ver >= 7 [
+				res: res - 36
+			]
+		]
+		res
+	]
+
+	get-data-code-words-bytes: function [ver [integer!] ecc-level [word!]][
+		ecc-code-words: pick ECC_CODEWORDS_PER_BLOCK/(ecc-level) ver
+		num-ecc: pick NUM_ERROR_CORRECTION_BLOCKS/(ecc-level) ver
+		res: get-data-modules-bits ver
+		res: res / 8 - (ecc-code-words * num-ecc)
+		res
+	]
+
+	encode-number: function [str [string!] ver [integer!] ecc-level [word!]][
 		str-len: length? str
 		item-bits: get-encode-bits 'number ver
 		item: str
@@ -186,16 +224,29 @@ qrcode: context [
 		part-str: enbase/base part-bin 2
 		if item-bits > part-len: length? part-str [return none]
 		begin: skip part-str part-len - item-bits
-		res: rejoin ["0001" copy/part begin item-bits bits "0000"]
+		res: rejoin [mode-indicators/number copy/part begin item-bits bits mode-indicators/terminator]
 		res-len: length? res
 		m: res-len % 8
 		if m <> 0 [
 			append/dup res "0" 8 - m
 		]
+		code-len: get-data-code-words-bytes ver ecc-level
+		res-len: (length? res) / 8
+		if res-len > code-len [return none]
+		if res-len = code-len [return res]
+		pad-index: 1
+		loop code-len - res-len [
+			append res padding-bin/(pad-index)
+			either pad-index = 1 [
+				pad-index: 2
+			][
+				pad-index: 1
+			]
+		]
 		res
 	]
 
-	encode-alphanumber: function [str [string!] ver [integer!]][
+	encode-alphanumber: function [str [string!] ver [integer!] ecc-level [word!]][
 		str-len: length? str
 		item-bits: get-encode-bits 'alphanumber ver
 		table: make block! str-len
@@ -225,16 +276,36 @@ qrcode: context [
 		part-str: enbase/base part-bin 2
 		if item-bits > part-len: length? part-str [return none]
 		begin: skip part-str part-len - item-bits
-		res: rejoin ["0010" copy/part begin item-bits bits "0000"]
+		res: rejoin [mode-indicators/alphanumber copy/part begin item-bits bits mode-indicators/terminator]
 		res-len: length? res
 		m: res-len % 8
 		if m <> 0 [
 			append/dup res "0" 8 - m
 		]
+		code-len: get-data-code-words-bytes ver ecc-level
+		res-len: (length? res) / 8
+		if res-len > code-len [return none]
+		if res-len = code-len [return res]
+		pad-index: 1
+		loop code-len - res-len [
+			append res padding-bin/(pad-index)
+			either pad-index = 1 [
+				pad-index: 2
+			][
+				pad-index: 1
+			]
+		]
 		res
+	]
+
+	encode-data: function [str [string!]][
+
 	]
 ]
 
-print "000100000010000000001100010101100110000110000000" = qrcode/encode-number "01234567" 1
-print "001000000010100111001110111001110010000100000000" = qrcode/encode-alphanumber "AC-42" 1
-print "00100000010110110000101101111000110100010111001011011100010011010100001101000000" = qrcode/encode-alphanumber "HELLO WORLD" 1
+r: qrcode/encode-number "01234567" 1 'H
+print r = "000100000010000000001100010101100110000110000000111011000001000111101100"
+r: qrcode/encode-alphanumber "AC-42" 1 'H
+print r = "001000000010100111001110111001110010000100000000111011000001000111101100"
+r: qrcode/encode-alphanumber "HELLO WORLD" 1 'Q
+print r = "00100000010110110000101101111000110100010111001011011100010011010100001101000000111011000001000111101100"
