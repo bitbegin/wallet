@@ -212,7 +212,7 @@ btc: context [
 		new-error 'post-url "server error" reduce [command res]
 	]
 
-	publish-tx: function [network [url!] tx [string!]][
+	publish-tx-old: function [network [url!] tx [string!]][
 		url: rejoin [network "/tools/tx-publish"]
 		body: make map! reduce ['rawhex tx]
 		resp: post-url url body
@@ -220,6 +220,21 @@ btc: context [
 			new-error 'publish-tx "server error" reduce [url err-no resp/err_msg]
 		]
 		true
+	]
+
+
+	publish-tx: function [network [url!] tx [string!]][
+		either find network "tchain" [
+			url: https://chain.so/api/v2/send_tx/BTCTEST
+		][
+			url: https://chain.so/api/v2/send_tx/BTC
+		]
+		body: make map! reduce ['tx_hex tx]
+		resp: post-url url body
+		if "success" <> resp/status [
+			new-error 'publish-tx "server error" reduce [url resp/status]
+		]
+		resp/data/txid
 	]
 
 	decode-tx: function [network [url!] tx [string!]][

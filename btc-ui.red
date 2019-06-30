@@ -388,14 +388,9 @@ context [
 
 	do-confirm: func [face [object!] event [event!] /local datas txid result][
 		datas: lowercase enbase/base signed-data 16
-		if error? txid: try [btc/decode-tx network datas][
-			tx-error/text: rejoin ["Error! Please try again^/^/" form txid]
-			view/flags tx-error-dlg 'modal
-			exit
-		]
-		either error? result: try [btc/publish-tx network datas][
+		either error? txid: try [btc/publish-tx network datas][
 			unview
-			tx-error/text: rejoin ["Error! Please try again^/^/" form result]
+			tx-error/text: rejoin ["Error! Please try again^/^/" form txid]
 			view/flags tx-error-dlg 'modal
 		][
 			unview
