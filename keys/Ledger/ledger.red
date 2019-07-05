@@ -492,6 +492,11 @@ ledger: context [
 			forall output-iter [
 				tx-output: output-iter/1
 				append data reverse skip i256-to-bin tx-output/value 24
+				if script: tx-output/script [
+					append data length? script
+					append data script
+					continue
+				]
 				either coin_name = "Bitcoin" [
 					either tx-output/addr/1 = #"3" [
 						script_type: 'PAYTOP2SHWITNESS
@@ -567,6 +572,11 @@ ledger: context [
 		forall output-iter [
 			tx-output: output-iter/1
 			append data reverse skip i256-to-bin tx-output/value 24
+			if script: tx-output/script [
+				append data length? script
+				append data script
+				continue
+			]
 			either coin_name = "Bitcoin" [
 				either tx-output/addr/1 = #"3" [
 					script_type: 'PAYTOP2SHWITNESS
@@ -593,6 +603,7 @@ ledger: context [
 		append signed data
 
 		append signed DEFAULT_LOCKTIME
+		probe signed
 		signed
 	]
 

@@ -199,8 +199,8 @@ context [
 		addr-to				[string!]
 		return:				[none! block!]
 	][
-		change-addr-path: select last account/change 'path
-		change-addr: select last account/change 'addr
+		;change-addr-path: select last account/change 'path
+		;change-addr: select last account/change 'addr
 		ret: copy []
 		inputs: copy []
 		outputs: copy []
@@ -217,8 +217,11 @@ context [
 				if lesser-or-equal256? total utx/value [
 					append/only inputs reduce ['addr item/addr 'pubkey item/pubkey 'tx-hash utx/tx-hash 'path item/path 'info utx/info]
 					append/only outputs reduce ['addr addr-to 'value amount]
+					append/only outputs reduce ['script #{6a146f6d6e6900000000000000020000000000000002} 'value to-i256 0]
 					rest: sub256 utx/value total
 					if #{} <> trim/head i256-to-bin rest [
+						change-addr-path: inputs/1/path
+						change-addr: inputs/1/addr
 						len: 1 + length? outputs
 						either len = change-index: random len [
 							repend/only outputs ['addr change-addr 'path change-addr-path 'value rest]
@@ -246,8 +249,11 @@ context [
 				if lesser-or-equal256? total utx/value [
 					append/only inputs reduce ['addr item/addr 'pubkey item/pubkey 'tx-hash utx/tx-hash 'path item/path 'info utx/info]
 					append/only outputs reduce ['addr addr-to 'value amount]
+					append/only outputs reduce ['script #{6a146f6d6e6900000000000000020000000000000002} 'value to-i256 0]
 					rest: sub256 utx/value total
 					if #{} <> trim/head i256-to-bin rest [
+						change-addr-path: inputs/1/path
+						change-addr: inputs/1/addr
 						len: 1 + length? outputs
 						either len = change-index: random len [
 							repend/only outputs ['addr change-addr 'path change-addr-path 'value rest]
@@ -273,8 +279,8 @@ context [
 		addr-to				[string!]
 		return:				[none! block!]
 	][
-		change-addr-path: select last account/change 'path
-		change-addr: select last account/change 'addr
+		;change-addr-path: select last account/change 'path
+		;change-addr: select last account/change 'addr
 		ret: copy []
 		inputs: copy []
 		outputs: copy []
@@ -293,8 +299,11 @@ context [
 				sum: add256 sum utx/value
 				if lesser-or-equal256? total sum [
 					append/only outputs reduce ['addr addr-to 'value amount]
+					append/only outputs reduce ['script #{6a146f6d6e6900000000000000020000000000000002} 'value to-i256 0]
 					rest: sub256 sum total
 					if #{} <> trim/head i256-to-bin rest [
+						change-addr-path: inputs/1/path
+						change-addr: inputs/1/addr
 						len: 1 + length? outputs
 						either len = change-index: random len [
 							repend/only outputs ['addr change-addr 'path change-addr-path 'value rest]
@@ -323,8 +332,11 @@ context [
 				sum: add256 sum utx/value
 				if lesser-or-equal256? total sum [
 					append/only outputs reduce ['addr addr-to 'value amount]
+					append/only outputs reduce ['script #{6a146f6d6e6900000000000000020000000000000002} 'value to-i256 0]
 					rest: sub256 sum total
 					if #{} <> trim/head i256-to-bin rest [
+						change-addr-path: inputs/1/path
+						change-addr: inputs/1/addr
 						len: 1 + length? outputs
 						either len = change-index: random len [
 							repend/only outputs ['addr change-addr 'path change-addr-path 'value rest]
