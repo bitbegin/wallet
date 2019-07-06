@@ -206,38 +206,6 @@ context [
 		outputs: copy []
 		total: add256 amount fee
 
-		foreach item account/change [
-			if item/tx-count = 0 [continue]
-			if zero256? item/balance [continue]
-			if item/utxs = none [continue]
-
-			foreach utx item/utxs [
-				if utx/confirmations < 3 [continue]
-				if utx/spent [continue]
-				if lesser-or-equal256? total utx/value [
-					append/only inputs reduce ['addr item/addr 'pubkey item/pubkey 'tx-hash utx/tx-hash 'path item/path 'info utx/info]
-					append/only outputs reduce ['addr addr-to 'value amount]
-					append/only outputs reduce ['script #{6a146f6d6e6900000000000000020000000000000002} 'value to-i256 0]
-					rest: sub256 utx/value total
-					if #{} <> trim/head i256-to-bin rest [
-						change-addr-path: inputs/1/path
-						change-addr: inputs/1/addr
-						len: 1 + length? outputs
-						either len = change-index: random len [
-							repend/only outputs ['addr change-addr 'path change-addr-path 'value rest]
-						][
-							outputs-at: at outputs change-index
-							insert/only outputs-at reduce ['addr change-addr 'path change-addr-path 'value rest]
-						]
-						append ret reduce ['change-index change-index]
-					]
-					append ret reduce ['inputs inputs]
-					append ret reduce ['outputs outputs]
-					return ret
-				]
-			]
-		]
-
 		foreach item account/origin [
 			if item/tx-count = 0 [continue]
 			if zero256? item/balance [continue]
@@ -256,12 +224,44 @@ context [
 						change-addr: inputs/1/addr
 						len: 1 + length? outputs
 						either len = change-index: random len [
-							repend/only outputs ['addr change-addr 'path change-addr-path 'value rest]
+							repend/only outputs ['addr change-addr 'value rest]
 						][
 							outputs-at: at outputs change-index
-							insert/only outputs-at reduce ['addr change-addr 'path change-addr-path 'value rest]
+							insert/only outputs-at reduce ['addr change-addr 'value rest]
 						]
-						append ret reduce ['change-index change-index]
+						;append ret reduce ['change-index change-index]
+					]
+					append ret reduce ['inputs inputs]
+					append ret reduce ['outputs outputs]
+					return ret
+				]
+			]
+		]
+
+		foreach item account/change [
+			if item/tx-count = 0 [continue]
+			if zero256? item/balance [continue]
+			if item/utxs = none [continue]
+
+			foreach utx item/utxs [
+				if utx/confirmations < 3 [continue]
+				if utx/spent [continue]
+				if lesser-or-equal256? total utx/value [
+					append/only inputs reduce ['addr item/addr 'pubkey item/pubkey 'tx-hash utx/tx-hash 'path item/path 'info utx/info]
+					append/only outputs reduce ['addr addr-to 'value amount]
+					append/only outputs reduce ['script #{6a146f6d6e6900000000000000020000000000000002} 'value to-i256 0]
+					rest: sub256 utx/value total
+					if #{} <> trim/head i256-to-bin rest [
+						change-addr-path: inputs/1/path
+						change-addr: inputs/1/addr
+						len: 1 + length? outputs
+						either len = change-index: random len [
+							repend/only outputs ['addr change-addr 'value rest]
+						][
+							outputs-at: at outputs change-index
+							insert/only outputs-at reduce ['addr change-addr 'value rest]
+						]
+						;append ret reduce ['change-index change-index]
 					]
 					append ret reduce ['inputs inputs]
 					append ret reduce ['outputs outputs]
@@ -287,39 +287,6 @@ context [
 		total: add256 amount fee
 		sum: to-i256 0
 
-		foreach item account/change [
-			if item/tx-count = 0 [continue]
-			if zero256? item/balance [continue]
-			if item/utxs = none [continue]
-
-			foreach utx item/utxs [
-				if utx/confirmations < 3 [continue]
-				if utx/spent [continue]
-				append/only inputs reduce ['addr item/addr 'pubkey item/pubkey 'tx-hash utx/tx-hash 'path item/path 'info utx/info]
-				sum: add256 sum utx/value
-				if lesser-or-equal256? total sum [
-					append/only outputs reduce ['addr addr-to 'value amount]
-					append/only outputs reduce ['script #{6a146f6d6e6900000000000000020000000000000002} 'value to-i256 0]
-					rest: sub256 sum total
-					if #{} <> trim/head i256-to-bin rest [
-						change-addr-path: inputs/1/path
-						change-addr: inputs/1/addr
-						len: 1 + length? outputs
-						either len = change-index: random len [
-							repend/only outputs ['addr change-addr 'path change-addr-path 'value rest]
-						][
-							outputs-at: at outputs change-index
-							insert/only outputs-at reduce ['addr change-addr 'path change-addr-path 'value rest]
-						]
-						append ret reduce ['change-index change-index]
-					]
-					append ret reduce ['inputs inputs]
-					append ret reduce ['outputs outputs]
-					return ret
-				]
-			]
-		]
-
 		foreach item account/origin [
 			if item/tx-count = 0 [continue]
 			if zero256? item/balance [continue]
@@ -339,12 +306,45 @@ context [
 						change-addr: inputs/1/addr
 						len: 1 + length? outputs
 						either len = change-index: random len [
-							repend/only outputs ['addr change-addr 'path change-addr-path 'value rest]
+							repend/only outputs ['addr change-addr 'value rest]
 						][
 							outputs-at: at outputs change-index
-							insert/only outputs-at reduce ['addr change-addr 'path change-addr-path 'value rest]
+							insert/only outputs-at reduce ['addr change-addr 'value rest]
 						]
-						append ret reduce ['change-index change-index]
+						;append ret reduce ['change-index change-index]
+					]
+					append ret reduce ['inputs inputs]
+					append ret reduce ['outputs outputs]
+					return ret
+				]
+			]
+		]
+
+		foreach item account/change [
+			if item/tx-count = 0 [continue]
+			if zero256? item/balance [continue]
+			if item/utxs = none [continue]
+
+			foreach utx item/utxs [
+				if utx/confirmations < 3 [continue]
+				if utx/spent [continue]
+				append/only inputs reduce ['addr item/addr 'pubkey item/pubkey 'tx-hash utx/tx-hash 'path item/path 'info utx/info]
+				sum: add256 sum utx/value
+				if lesser-or-equal256? total sum [
+					append/only outputs reduce ['addr addr-to 'value amount]
+					append/only outputs reduce ['script #{6a146f6d6e6900000000000000020000000000000002} 'value to-i256 0]
+					rest: sub256 sum total
+					if #{} <> trim/head i256-to-bin rest [
+						change-addr-path: inputs/1/path
+						change-addr: inputs/1/addr
+						len: 1 + length? outputs
+						either len = change-index: random len [
+							repend/only outputs ['addr change-addr 'value rest]
+						][
+							outputs-at: at outputs change-index
+							insert/only outputs-at reduce ['addr change-addr 'value rest]
+						]
+						;append ret reduce ['change-index change-index]
 					]
 					append ret reduce ['inputs inputs]
 					append ret reduce ['outputs outputs]

@@ -603,7 +603,6 @@ ledger: context [
 		append signed data
 
 		append signed DEFAULT_LOCKTIME
-		probe signed
 		signed
 	]
 
