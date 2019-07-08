@@ -1,6 +1,11 @@
 Red []
 
 qrcode: context [
+	buffer-len?: function [ver [integer!]][
+		temp: n * 4 + 17
+		temp: temp * temp / 8 + 1
+		temp
+	]
 	mode-indicators: [
 		terminator		{0000}
 		fnc1-first		{0101}
@@ -67,27 +72,6 @@ qrcode: context [
 		true
 	]
 
-	byte-mode?: function [str [string!]][
-		forall str [
-			if 255 < to integer! str/1 [return false]
-		]
-		true
-	]
-
-	get-mode: function [str [string!]][
-		if number-mode? str [
-			return 'number
-		]
-		if alphanumber-mode? str [
-			return 'alphanumber
-		]
-		if byte-mode? str [
-			return 'byte
-		]
-		;-- only support utf8 (not support eci or kanji)
-		'byte-utf8
-	]
-
 	get-encode-bits: function [mode [word!] ver [integer!]][
 		if mode = 'number [
 			if ver <= 9 [return 10]
@@ -136,7 +120,37 @@ qrcode: context [
 		res
 	]
 
-	encode-number: function [str [string!] ver [integer!] ecc-level [word!]][
+	get-segment-bits: function [mode [word!] num-chars [integer!]][
+		if num-chars > 32767 [return -1]
+		res: num-chars
+		case [
+			mode = 'number [
+				res: res * 10 + 2 / 3
+			]
+			mode = 'alphanumber [
+				res: res * 11 + 1 / 2
+			]
+			mode = 'byte [
+				res: res * 8
+			]
+			mode = 'kanji [
+				res: res * 13
+			]
+			all [
+				mode = 'eci
+				num-chars = 0
+			][
+				res: 3 * 8
+			]
+			true [
+				return -1
+			]
+		]
+		if res > 32767 [return -1]
+		res
+	]
+
+	encode-number: function [str [string!]][
 		str-len: length? str
 		item: str
 		bits: make string! 64
@@ -207,18 +221,40 @@ qrcode: context [
 		]
 	]
 
-	encode-byte: function [bin [binary!]][
-		str-len: length? bin
-		bits: enbase/base copy bin 2
-		reduce [
-			'mode 'byte
-			'num-chars str-len
-			'data bits
+	encode-data: function [
+		str [string!]
+		ecl [word!]
+		min-version [integer!]
+		max-version [integer!]
+		mask [word!]
+		boost-ecl? [logic!]
+	][
+		bin: to binary! str
+		bin-len: length? bin
+		;-- TODO: len 0
+
+		;-- buffer len
+		buf-len: buffer-len? max-version
+		case [
+			number-mode? str [
+				if -1 = bytes: get-segment-bits 'number bin-len [return none]
+				if ((bytes + 7) / 8) > buf-len [return none]
+				seg: encode-number str
+			]
+			alphanumber-mode? str [
+				if -1 = bytes: get-segment-bits 'alphanumber bin-len [return none]
+				if ((bytes + 7) / 8) > buf-len [return none]
+				seg: encode-alphanumber str
+			]
+			true [
+				if bin-len > buf-len [return none]
+				seg: reduce [
+					'mode 'byte
+					'num-chars get-segment-bits 'byte bin-len
+					'data copy bin
+				]
+			]
 		]
-	]
-
-	encode-data: function [str [string!]][
-
 	]
 ]
 
