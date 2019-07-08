@@ -138,7 +138,6 @@ qrcode: context [
 
 	encode-number: function [str [string!] ver [integer!] ecc-level [word!]][
 		str-len: length? str
-		item-bits: get-encode-bits 'number ver
 		item: str
 		bits: make string! 64
 		while [0 < len: length? item][
@@ -168,35 +167,15 @@ qrcode: context [
 				]
 			]
 		]
-		part-bin: to binary! str-len
-		part-str: enbase/base part-bin 2
-		if item-bits > part-len: length? part-str [return none]
-		begin: skip part-str part-len - item-bits
-		res: rejoin [mode-indicators/number copy/part begin item-bits bits mode-indicators/terminator]
-		res-len: length? res
-		m: res-len % 8
-		if m <> 0 [
-			append/dup res "0" 8 - m
+		reduce [
+			'mode 'number
+			'num-chars str-len
+			'data bits
 		]
-		code-len: get-data-code-words-bytes ver ecc-level
-		res-len: (length? res) / 8
-		if res-len > code-len [return none]
-		if res-len = code-len [return res]
-		pad-index: 1
-		loop code-len - res-len [
-			append res padding-bin/(pad-index)
-			either pad-index = 1 [
-				pad-index: 2
-			][
-				pad-index: 1
-			]
-		]
-		res
 	]
 
-	encode-alphanumber: function [str [string!] ver [integer!] ecc-level [word!]][
+	encode-alphanumber: function [str [string!]][
 		str-len: length? str
-		item-bits: get-encode-bits 'alphanumber ver
 		table: make block! str-len
 		forall str [
 			index: index? find alphanumber str/1
@@ -221,60 +200,21 @@ qrcode: context [
 				item: skip item 1
 			]
 		]
-		part-bin: to binary! str-len
-		part-str: enbase/base part-bin 2
-		if item-bits > part-len: length? part-str [return none]
-		begin: skip part-str part-len - item-bits
-		res: rejoin [mode-indicators/alphanumber copy/part begin item-bits bits mode-indicators/terminator]
-		res-len: length? res
-		m: res-len % 8
-		if m <> 0 [
-			append/dup res "0" 8 - m
+		reduce [
+			'mode 'alphanumber
+			'num-chars str-len
+			'data bits
 		]
-		code-len: get-data-code-words-bytes ver ecc-level
-		res-len: (length? res) / 8
-		if res-len > code-len [return none]
-		if res-len = code-len [return res]
-		pad-index: 1
-		loop code-len - res-len [
-			append res padding-bin/(pad-index)
-			either pad-index = 1 [
-				pad-index: 2
-			][
-				pad-index: 1
-			]
-		]
-		res
 	]
 
-	encode-byte: function [bin [binary!] ver [integer!] ecc-level [word!]][
+	encode-byte: function [bin [binary!]][
 		str-len: length? bin
-		item-bits: get-encode-bits 'byte ver
-		bits: copy bin
-		part-bin: to binary! str-len
-		part-str: enbase/base part-bin 2
-		if item-bits > part-len: length? part-str [return none]
-		begin: skip part-str part-len - item-bits
-		res: rejoin [mode-indicators/byte copy/part begin item-bits bits mode-indicators/terminator]
-		res-len: length? res
-		m: res-len % 8
-		if m <> 0 [
-			append/dup res "0" 8 - m
+		bits: enbase/base copy bin 2
+		reduce [
+			'mode 'byte
+			'num-chars str-len
+			'data bits
 		]
-		code-len: get-data-code-words-bytes ver ecc-level
-		res-len: (length? res) / 8
-		if res-len > code-len [return none]
-		if res-len = code-len [return res]
-		pad-index: 1
-		loop code-len - res-len [
-			append res padding-bin/(pad-index)
-			either pad-index = 1 [
-				pad-index: 2
-			][
-				pad-index: 1
-			]
-		]
-		res
 	]
 
 	encode-data: function [str [string!]][
