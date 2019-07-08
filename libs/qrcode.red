@@ -25,6 +25,8 @@ qrcode: context [
 	version-base: 21x21
 	version-step: 4x4
 	version-end: 40
+	VERSION_MIN: 1
+	VERSION_MAX: 40
 
 	get-version-size: function [version [integer!]][
 		if version > version-end [return none]
@@ -72,34 +74,6 @@ qrcode: context [
 		true
 	]
 
-	get-encode-bits: function [mode [word!] ver [integer!]][
-		if mode = 'number [
-			if ver <= 9 [return 10]
-			if ver <= 26 [return 12]
-			if ver <= 40 [return 14]
-			return none
-		]
-		if mode = 'alphanumber [
-			if ver <= 9 [return 9]
-			if ver <= 26 [return 11]
-			if ver <= 40 [return 13]
-			return none
-		]
-		if mode = 'byte [
-			if ver <= 9 [return 8]
-			if ver <= 26 [return 16]
-			if ver <= 40 [return 16]
-			return none
-		]
-		if mode = 'kanji [
-			if ver <= 9 [return 8]
-			if ver <= 26 [return 10]
-			if ver <= 40 [return 12]
-			return none
-		]
-		none
-	]
-
 	get-data-modules-bits: function [ver [integer!]][
 		res: (16 * ver + 128) * ver + 64
 		if ver >= 2 [
@@ -121,7 +95,7 @@ qrcode: context [
 	]
 
 	get-segment-bits: function [mode [word!] num-chars [integer!]][
-		if num-chars > 32767 [return -1]
+		if num-chars > 32767 [return none]
 		res: num-chars
 		case [
 			mode = 'number [
@@ -143,10 +117,10 @@ qrcode: context [
 				res: 3 * 8
 			]
 			true [
-				return -1
+				return none
 			]
 		]
-		if res > 32767 [return -1]
+		if res > 32767 [return none]
 		res
 	]
 
@@ -155,7 +129,7 @@ qrcode: context [
 		item: str
 		bits: make string! 64
 		while [0 < len: length? item][
-			either len > 3 [
+			either len >= 3 [
 				part: copy/part item 3
 				part-bin: to binary! to integer! part
 				part-str: enbase/base part-bin 2
@@ -198,7 +172,7 @@ qrcode: context [
 		item: table
 		bits: make string! 64
 		while [0 < len: length? item][
-			either len > 2 [
+			either len >= 2 [
 				part-bin: to binary! (item/1 * 45 + item/2)
 				part-str: enbase/base part-bin 2
 				if 11 > part-len: length? part-str [return none]
@@ -222,14 +196,18 @@ qrcode: context [
 	]
 
 	encode-data: function [
-		str [string!]
-		ecl [word!]
-		min-version [integer!]
-		max-version [integer!]
-		mask [word!]
-		boost-ecl? [logic!]
+		str				[string! binary!]
+		ecl				[word!]
+		min-version		[integer!]
+		max-version		[integer!]
+		mask			[integer!]
+		boost-ecl?		[logic!]
 	][
-		bin: to binary! str
+		either string? str [
+			bin: to binary! str
+		][
+			bin: copy str
+		]
 		bin-len: length? bin
 		;-- TODO: len 0
 
@@ -237,24 +215,173 @@ qrcode: context [
 		buf-len: buffer-len? max-version
 		case [
 			number-mode? str [
-				if -1 = bytes: get-segment-bits 'number bin-len [return none]
-				if ((bytes + 7) / 8) > buf-len [return none]
+				unless blen: get-segment-bits 'number bin-len [return none]
+				if ((blen + 7) / 8) > buf-len [return none]
 				seg: encode-number str
 			]
 			alphanumber-mode? str [
-				if -1 = bytes: get-segment-bits 'alphanumber bin-len [return none]
-				if ((bytes + 7) / 8) > buf-len [return none]
+				unless blen: get-segment-bits 'alphanumber bin-len [return none]
+				if ((blen + 7) / 8) > buf-len [return none]
 				seg: encode-alphanumber str
 			]
 			true [
 				if bin-len > buf-len [return none]
+				unless blen: get-segment-bits 'byte bin-len [return none]
 				seg: reduce [
 					'mode 'byte
 					'num-chars get-segment-bits 'byte bin-len
-					'data copy bin
+					'data enbase/base bin 2
 				]
 			]
 		]
+	]
+
+	encode-segments: function [
+		segs			[block!]
+		ecl				[word!]
+		min-version		[integer!]
+		max-version		[integer!]
+		mask			[integer!]
+		boost-ecl?		[logic!]
+	][
+		unless all [
+			VERSION_MIN <= min-version
+			min-version <= max-version
+			max-version <= VERSION_MAX
+		][return none]
+		unless find error-group ecl [return none]
+		unless all [
+			mask >= -1
+			mask <= 7
+		][return none]
+
+		version: min-version
+		forever [
+			cap-bits: 8 * get-data-code-words-bytes version ecl
+			unless used-bits: total-bits segs version [
+				return none
+			]
+			if all [
+				used-bits
+				used-bits <= cap-bits
+			][break]
+			if version >= max-version [return none]
+			version: version + 1
+		]
+
+		if boost-ecl? [
+			ecls: [M Q H]
+			forall ecls [
+				if used-bits <= 8 * get-data-code-words-bytes version ecls/1 [
+					ecl: ecls/1
+				]
+			]
+		]
+
+		unless data-bits: encode-padding segs used-bits [
+			return none
+		]
+		
+	]
+
+	encode-padding: function [
+		segs			[block!]
+		used-bits		[integer!]
+	][
+		res: make string! 200
+		forall segs [
+			mode: segs/1/mode
+			data: segs/1/data
+			num-chars: segs/1/num-chars
+			num-bits: num-char-bits mode
+			part-bin: to binary! num-chars
+			part-str: enbase/base part-bin 2
+			if num-bits > part-len: length? part-str [return none]
+			begin: skip part-str part-len - num-bits
+			append res rejoin [
+				select mode-indicators mode
+				copy/part begin num-bits
+				segs/1/data
+			]
+		]
+		if used-bits <> bit-len: length? res [return none]
+		cap-bits: 8 * get-data-code-words-bytes version ecl
+		if bit-len > cap-bits [return none]
+		if 4 < terminator-bits: cap-bits - bit-len [
+			terminator-bits: 4
+		]
+		append/dup res "0" terminator-bits
+		res-len: length? res
+		m: res-len % 8
+		if m <> 0 [
+			append/dup res "0" 8 - m
+		]
+		bit-len: length? res
+		if 0 <> bit-len % 8 [return none]
+		res-len: (length? res) / 8
+		if res-len > cap-bits [return none]
+		if res-len = cap-bits [return res]
+		pad-index: 1
+		loop cap-bits - res-len [
+			append res padding-bin/(pad-index)
+			either pad-index = 1 [
+				pad-index: 2
+			][
+				pad-index: 1
+			]
+		]
+		res
+	]
+
+	total-bits: function [
+		segs			[block!]
+		version			[integer!]
+	][
+		len: length? segs
+		res: 0
+		forall segs [
+			num-chars: segs/1/num-chars
+			bit-len: length? segs/1/data
+			unless cc-bits: num-char-bits segs/1/mode version [
+				return none
+			]
+			if num-chars >= (1 << cc-bits) [
+				return none
+			]
+			res: res + 4 + cc-bits + bit-len
+			if res > 32767 [return none]
+		]
+		res
+	]
+	num-char-bits: function [
+		mode			[word!]
+		version			[integer!]
+	][
+		if mode = 'number [
+			if ver <= 9 [return 10]
+			if ver <= 26 [return 12]
+			if ver <= 40 [return 14]
+			return none
+		]
+		if mode = 'alphanumber [
+			if ver <= 9 [return 9]
+			if ver <= 26 [return 11]
+			if ver <= 40 [return 13]
+			return none
+		]
+		if mode = 'byte [
+			if ver <= 9 [return 8]
+			if ver <= 26 [return 16]
+			if ver <= 40 [return 16]
+			return none
+		]
+		if mode = 'kanji [
+			if ver <= 9 [return 8]
+			if ver <= 26 [return 10]
+			if ver <= 40 [return 12]
+			return none
+		]
+		none
 	]
 ]
 
