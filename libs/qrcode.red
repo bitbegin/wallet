@@ -47,7 +47,7 @@ qrcode: context [
 		H	[ 1  1  2  4  4  4  5  6  8  8 11 11 16 16 18 16 19 21 25 25 25 34 30 32 35 37 40 42 45 48 51 54 57 60 63 66 70 74 77 81]
 	]
 
-	alphanumber: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	alphanumber: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:"
 
 	number-mode?: function [str [string!]][
 		forall str [
@@ -84,8 +84,8 @@ qrcode: context [
 		if byte-mode? str [
 			return 'byte
 		]
-		;-- not support
-		none
+		;-- only support utf8 (not support eci or kanji)
+		'byte-utf8
 	]
 
 	get-encode-bits: function [mode [word!] ver [integer!]][
@@ -146,9 +146,9 @@ qrcode: context [
 				part: copy/part item 3
 				part-bin: to binary! to integer! part
 				part-str: enbase/base part-bin 2
-				if item-bits > part-len: length? part-str [return none]
-				begin: skip part-str part-len - item-bits
-				append bits copy/part begin item-bits
+				if 10 > part-len: length? part-str [return none]
+				begin: skip part-str part-len - 10
+				append bits copy/part begin 10
 				item: skip item 3
 			][
 				either len = 1 [
@@ -226,6 +226,36 @@ qrcode: context [
 		if item-bits > part-len: length? part-str [return none]
 		begin: skip part-str part-len - item-bits
 		res: rejoin [mode-indicators/alphanumber copy/part begin item-bits bits mode-indicators/terminator]
+		res-len: length? res
+		m: res-len % 8
+		if m <> 0 [
+			append/dup res "0" 8 - m
+		]
+		code-len: get-data-code-words-bytes ver ecc-level
+		res-len: (length? res) / 8
+		if res-len > code-len [return none]
+		if res-len = code-len [return res]
+		pad-index: 1
+		loop code-len - res-len [
+			append res padding-bin/(pad-index)
+			either pad-index = 1 [
+				pad-index: 2
+			][
+				pad-index: 1
+			]
+		]
+		res
+	]
+
+	encode-byte: function [bin [binary!] ver [integer!] ecc-level [word!]][
+		str-len: length? bin
+		item-bits: get-encode-bits 'byte ver
+		bits: copy bin
+		part-bin: to binary! str-len
+		part-str: enbase/base part-bin 2
+		if item-bits > part-len: length? part-str [return none]
+		begin: skip part-str part-len - item-bits
+		res: rejoin [mode-indicators/byte copy/part begin item-bits bits mode-indicators/terminator]
 		res-len: length? res
 		m: res-len % 8
 		if m <> 0 [
