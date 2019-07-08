@@ -47,53 +47,7 @@ qrcode: context [
 		H	[ 1  1  2  4  4  4  5  6  8  8 11 11 16 16 18 16 19 21 25 25 25 34 30 32 35 37 40 42 45 48 51 54 57 60 63 66 70 74 77 81]
 	]
 
-	alphanumber: [
-		#"0" 0
-		#"1" 1
-		#"2" 2
-		#"3" 3
-		#"4" 4
-		#"5" 5
-		#"6" 6
-		#"7" 7
-		#"8" 8
-		#"9" 9
-		#"A" 10
-		#"B" 11
-		#"C" 12
-		#"D" 13
-		#"E" 14
-		#"F" 15
-		#"G" 16
-		#"H" 17
-		#"I" 18
-		#"J" 19
-		#"K" 20
-		#"L" 21
-		#"M" 22
-		#"N" 23
-		#"O" 24
-		#"P" 25
-		#"Q" 26
-		#"R" 27
-		#"S" 28
-		#"T" 29
-		#"U" 30
-		#"V" 31
-		#"W" 32
-		#"X" 33
-		#"Y" 34
-		#"Z" 35
-		#" " 36
-		#"$" 37
-		#"%" 38
-		#"*" 39
-		#"+" 40
-		#"-" 41
-		#"." 42
-		#"/" 43
-		#":" 44
-	]
+	alphanumber: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 	number-mode?: function [str [string!]][
 		forall str [
@@ -132,12 +86,6 @@ qrcode: context [
 		]
 		;-- not support
 		none
-	]
-
-	encode-number: function [str [string!] ver [integer!]][
-		unless mode: get-mode str [return none]
-		len: length? str
-
 	]
 
 	get-encode-bits: function [mode [word!] ver [integer!]][
@@ -251,7 +199,8 @@ qrcode: context [
 		item-bits: get-encode-bits 'alphanumber ver
 		table: make block! str-len
 		forall str [
-			append table select alphanumber str/1
+			index: index? find alphanumber str/1
+			append table index - 1
 		]
 		item: table
 		bits: make string! 64
