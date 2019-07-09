@@ -2,7 +2,7 @@ Red []
 
 qrcode: context [
 	buffer-len?: function [ver [integer!]][
-		temp: n * 4 + 17
+		temp: ver * 4 + 17
 		temp: temp * temp / 8 + 1
 		temp
 	]
@@ -27,6 +27,8 @@ qrcode: context [
 	version-end: 40
 	VERSION_MIN: 1
 	VERSION_MAX: 40
+	REED_SOLOMON_DEGREE_MAX: 30
+	temp-buffer: make binary! buffer-len? VERSION_MAX
 
 	get-version-size: function [version [integer!]][
 		if version > version-end [return none]
@@ -234,6 +236,7 @@ qrcode: context [
 				]
 			]
 		]
+		encode-segments reduce [seg] ecl min-version max-version mask boost-ecl?
 	]
 
 	encode-segments: function [
@@ -277,23 +280,31 @@ qrcode: context [
 				]
 			]
 		]
-
-		unless data-bits: encode-padding segs used-bits [
+		probe version
+		probe segs
+		;probe debase/base segs/1/data 2
+		unless qrcode: encode-padding segs used-bits version ecl [
 			return none
 		]
-		
+		;probe qrcode
+		qrcode
+		;qrcode: debase/base qrcode 2
+		;probe qrcode
+		;encode-ecc qrcode version ecl
 	]
 
 	encode-padding: function [
 		segs			[block!]
 		used-bits		[integer!]
+		version			[integer!]
+		ecl				[word!]
 	][
 		res: make string! 200
 		forall segs [
 			mode: segs/1/mode
 			data: segs/1/data
 			num-chars: segs/1/num-chars
-			num-bits: num-char-bits mode
+			num-bits: num-char-bits mode version
 			part-bin: to binary! num-chars
 			part-str: enbase/base part-bin 2
 			if num-bits > part-len: length? part-str [return none]
@@ -304,8 +315,9 @@ qrcode: context [
 				segs/1/data
 			]
 		]
-		if used-bits <> bit-len: length? res [return none]
-		cap-bits: 8 * get-data-code-words-bytes version ecl
+		if used-bits <> (bit-len: length? res) [return none]
+		cap-bytes: get-data-code-words-bytes version ecl
+		cap-bits: 8 * cap-bytes
 		if bit-len > cap-bits [return none]
 		if 4 < terminator-bits: cap-bits - bit-len [
 			terminator-bits: 4
@@ -317,12 +329,12 @@ qrcode: context [
 			append/dup res "0" 8 - m
 		]
 		bit-len: length? res
-		if 0 <> bit-len % 8 [return none]
+		if 0 <> (bit-len % 8) [return none]
 		res-len: (length? res) / 8
-		if res-len > cap-bits [return none]
-		if res-len = cap-bits [return res]
+		if res-len > cap-bytes [return none]
+		if res-len = cap-bytes [return res]
 		pad-index: 1
-		loop cap-bits - res-len [
+		loop cap-bytes - res-len [
 			append res padding-bin/(pad-index)
 			either pad-index = 1 [
 				pad-index: 2
@@ -331,6 +343,105 @@ qrcode: context [
 			]
 		]
 		res
+	]
+
+	encode-ecc: function [
+		data			[binary!]
+		version			[integer!]
+		ecl				[word!]
+	][
+		num-blocks: pick NUM_ERROR_CORRECTION_BLOCKS/(ecc) version
+		block-ecc-len: pick ECC_CODEWORDS_PER_BLOCK/(ecc) version
+		raw-code-words: (get-data-modules-bits version) / 8
+		data-len: get-data-code-words-bytes version ecl
+		num-short-blocks: num-blocks - (raw-code-words % num-blocks)
+		short-block-data-len: raw-code-words / num-blocks - block-ecc-len
+
+		generator: calc-reed-solomon-generator block-ecc-len
+		i: 1
+		while [i <= num-blocks][
+			dlen: short-block-data-len + either (i - 1) < num-short-blocks [0][1]
+			ecc: skip data data-len
+			calc-reed-solomon-remainder data generator ecc
+			j: 1 k: i
+			while [j <= dlen][
+				if (j = short-block-data-len + 1) [
+					k: k - num-short-blocks
+				]
+				temp-buffer/(k): data/(j)
+				j: j + 1
+				k: k + num-blocks
+			]
+			j: 1 k: data-len + 1
+			while [j <= block-ecc-len][
+				temp-buffer/(k): ecc/(j)
+				j: j + 1
+				k: k + num-blocks
+			]
+			data: skip data data-len
+			i: i + 1
+		]
+	]
+
+	calc-reed-solomon-generator: function [degree [integer!]][
+		unless all [
+			degree >= 1
+			degree <= REED_SOLOMON_DEGREE_MAX
+		][return none]
+		res: make binary! degree
+		append/dup res 0 degree
+		res/(degree): 1
+
+		root: 1
+		i: 1 j: 1
+		while [i <= degree][
+			while [j <= degree][
+				res/(j): finite-field-multiply res/(j) root
+				if j < degree [
+					res/(j): res/(j) xor res/(j + 1)
+				]
+				j: j + 1
+			]
+			root: finite-field-multiply root 2
+			i: i + 1
+		]
+		res
+	]
+
+	calc-reed-solomon-remainder: function [data [binary!] generator [binary!] res [binary!]][
+		degree: length? generator
+		unless all [
+			degree >= 1
+			degree <= REED_SOLOMON_DEGREE_MAX
+		][return none]
+		i: 1
+		while [i <= degree][
+			res/(i): 0
+			i: i + 1
+		]
+		data-len: length? data
+		i: 1 j: 1
+		while [i <= data-len][
+			factor: data/(i) xor res/1
+			res: skip res
+			res/(degree): 0
+			while [j <= degree][
+				res/(j): res/(j) xor finite-field-multiply generator/(j) factor
+				j: j + 1
+			]
+			i: i + 1
+		]
+	]
+
+	finite-field-multiply: function [x [integer!] y [integer!]][
+		z: 0
+		i: 7
+		while [i >= 0][
+			z: (z << 1) xor (z >> 7 * 11Dh)
+			z: z xor (y >> i and 1) * x
+			i: i - 1
+		]
+		z
 	]
 
 	total-bits: function [
@@ -355,7 +466,7 @@ qrcode: context [
 	]
 	num-char-bits: function [
 		mode			[word!]
-		version			[integer!]
+		ver				[integer!]
 	][
 		if mode = 'number [
 			if ver <= 9 [return 10]
@@ -385,9 +496,9 @@ qrcode: context [
 	]
 ]
 
-r: qrcode/encode-number "01234567" 1 'H
+r: qrcode/encode-data "01234567" 'H 1 40 1 no
 print r = "000100000010000000001100010101100110000110000000111011000001000111101100"
-r: qrcode/encode-alphanumber "AC-42" 1 'H
+r: qrcode/encode-data "AC-42" 'H 1 40 1 no
 print r = "001000000010100111001110111001110010000100000000111011000001000111101100"
-r: qrcode/encode-alphanumber "HELLO WORLD" 1 'Q
+r: qrcode/encode-data "HELLO WORLD" 'Q 1 40 1 no
 print r = "00100000010110110000101101111000110100010111001011011100010011010100001101000000111011000001000111101100"
