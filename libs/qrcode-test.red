@@ -31,12 +31,51 @@ testFiniteFieldMultiply: function [][
 		]
 		cases: skip cases 3
 	]
+	true
 ]
 
-either error? try [testFiniteFieldMultiply][
+either error? e: try [testFiniteFieldMultiply][
 	print "testFiniteFieldMultiply failed!"
+	print e
 ][
 	print "testFiniteFieldMultiply ok"
+]
+
+testCalcReedSolomonGenerator: function [][
+	test-mode: pick [none encode ecc] 3
+	generator: qrcode/calc-reed-solomon-generator 1
+	unless generator = c: #{01} [
+		new-error 'testCalcReedSolomonGenerator 1 reduce [generator c]
+	]
+	generator: qrcode/calc-reed-solomon-generator 2
+	unless generator = c: #{0302} [
+		new-error 'testCalcReedSolomonGenerator 2 reduce [generator c]
+	]
+	generator: qrcode/calc-reed-solomon-generator 5
+	unless generator = c: #{1FC63F9374} [
+		new-error 'testCalcReedSolomonGenerator 5 reduce [generator c]
+	]
+	generator: qrcode/calc-reed-solomon-generator 30
+	unless all [
+		generator/1 = D4h
+		generator/2 = F6h
+		generator/6 = C0h
+		generator/13 = 16h
+		generator/14 = D9h
+		generator/21 = 12h
+		generator/28 = 6Ah
+		generator/30 = 96h
+	][
+		new-error 'testCalcReedSolomonGenerator 30 reduce [generator c]
+	]
+	true
+]
+
+either error? e: try [testCalcReedSolomonGenerator][
+	print "testCalcReedSolomonGenerator failed!"
+	print e
+][
+	print "testCalcReedSolomonGenerator ok"
 ]
 
 testEncodeData: function [][
@@ -53,10 +92,12 @@ testEncodeData: function [][
 	unless r = c: "00100000010110110000101101111000110100010111001011011100010011010100001101000000111011000001000111101100" [
 		new-error 'testEncodeData data reduce [r c]
 	]
+	true
 ]
 
-either error? try [testEncodeData][
+either error? e: try [testEncodeData][
 	print "testEncodeData failed!"
+	print e
 ][
 	print "testEncodeData ok"
 ]

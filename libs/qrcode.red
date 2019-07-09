@@ -405,8 +405,9 @@ qrcode: context [
 		res/(degree): 1
 
 		root: 1
-		i: 1 j: 1
+		i: 1
 		while [i <= degree][
+			j: 1
 			while [j <= degree][
 				res/(j): finite-field-multiply res/(j) root
 				if j < degree [
@@ -432,11 +433,12 @@ qrcode: context [
 			i: i + 1
 		]
 		probe data-len
-		i: 1 j: 1
+		i: 1
 		while [i <= data-len][
 			factor: data/(i) xor res/1
 			res: skip res 1
 			res/(degree): 0
+			j: 1
 			while [j <= degree][
 				res/(j): res/(j) xor finite-field-multiply generator/(j) factor
 				j: j + 1
@@ -507,13 +509,5 @@ qrcode: context [
 		none
 	]
 ]
-
-;test-mode: pick [none encode ecc] 2
-;r: qrcode/encode-data "01234567" 'H 1 40 1 no
-;print r = "000100000010000000001100010101100110000110000000111011000001000111101100"
-;r: qrcode/encode-data "AC-42" 'H 1 40 1 no
-;print r = "001000000010100111001110111001110010000100000000111011000001000111101100"
-;r: qrcode/encode-data "HELLO WORLD" 'Q 1 40 1 no
-;print r = "00100000010110110000101101111000110100010111001011011100010011010100001101000000111011000001000111101100"
 ;test-mode: pick [none encode ecc] 3
 ;r: qrcode/encode-data "HELLO WORLD" 'Q 1 40 1 no
