@@ -28,7 +28,13 @@ qrcode: context [
 	VERSION_MIN: 1
 	VERSION_MAX: 40
 	REED_SOLOMON_DEGREE_MAX: 30
-	temp-buffer: make binary! buffer-len? VERSION_MAX
+	max-buffer: function [][
+		len: buffer-len? VERSION_MAX
+		res: make binary! len
+		append/dup res 0 len
+	]
+	temp-buffer: max-buffer
+	qrcode-buffer: copy temp-buffer
 
 	get-version-size: function [version [integer!]][
 		if version > version-end [return none]
@@ -280,8 +286,6 @@ qrcode: context [
 				]
 			]
 		]
-		probe version
-		probe segs
 		unless qrcode: encode-padding segs used-bits version ecl [
 			return none
 		]
@@ -289,7 +293,15 @@ qrcode: context [
 		if test-mode = 'encode [return qrcode]
 		qrcode: debase/base qrcode 2
 		probe qrcode
+		len: length? qrcode
+		i: 1
+		while [i <= len][
+			poke qrcode-buffer i qrcode/(i)
+			i: i + 1
+		]
+		qrcode: qrcode-buffer
 		encode-ecc qrcode version ecl
+		probe temp-buffer
 	]
 
 	encode-padding: function [
@@ -349,35 +361,36 @@ qrcode: context [
 		version			[integer!]
 		ecl				[word!]
 	][
-		num-blocks: pick NUM_ERROR_CORRECTION_BLOCKS/(ecc) version
-		block-ecc-len: pick ECC_CODEWORDS_PER_BLOCK/(ecc) version
+		num-blocks: pick NUM_ERROR_CORRECTION_BLOCKS/(ecl) version
+		block-ecc-len: pick ECC_CODEWORDS_PER_BLOCK/(ecl) version
 		raw-code-words: (get-data-modules-bits version) / 8
 		data-len: get-data-code-words-bytes version ecl
 		num-short-blocks: num-blocks - (raw-code-words % num-blocks)
 		short-block-data-len: raw-code-words / num-blocks - block-ecc-len
 
 		generator: calc-reed-solomon-generator block-ecc-len
+		dat: data
 		i: 1
 		while [i <= num-blocks][
 			dlen: short-block-data-len + either (i - 1) < num-short-blocks [0][1]
 			ecc: skip data data-len
-			calc-reed-solomon-remainder data generator ecc
+			calc-reed-solomon-remainder dat dlen generator ecc
 			j: 1 k: i
 			while [j <= dlen][
-				if (j = short-block-data-len + 1) [
+				if j = (short-block-data-len + 1) [
 					k: k - num-short-blocks
 				]
-				temp-buffer/(k): data/(j)
+				poke temp-buffer k dat/(j)
 				j: j + 1
 				k: k + num-blocks
 			]
 			j: 1 k: data-len + 1
 			while [j <= block-ecc-len][
-				temp-buffer/(k): ecc/(j)
+				poke temp-buffer k ecc/(j)
 				j: j + 1
 				k: k + num-blocks
 			]
-			data: skip data data-len
+			dat: skip dat data-len
 			i: i + 1
 		]
 	]
@@ -407,7 +420,7 @@ qrcode: context [
 		res
 	]
 
-	calc-reed-solomon-remainder: function [data [binary!] generator [binary!] res [binary!]][
+	calc-reed-solomon-remainder: function [data [binary!] data-len [integer!] generator [binary!] res [binary!]][
 		degree: length? generator
 		unless all [
 			degree >= 1
@@ -418,11 +431,11 @@ qrcode: context [
 			res/(i): 0
 			i: i + 1
 		]
-		data-len: length? data
+		probe data-len
 		i: 1 j: 1
 		while [i <= data-len][
 			factor: data/(i) xor res/1
-			res: skip res
+			res: skip res 1
 			res/(degree): 0
 			while [j <= degree][
 				res/(j): res/(j) xor finite-field-multiply generator/(j) factor
@@ -436,11 +449,11 @@ qrcode: context [
 		z: 0
 		i: 7
 		while [i >= 0][
-			z: (z << 1) xor (z >> 7 * 11Dh)
-			z: z xor (y >> i and 1) * x
+			z: (z << 1 and FFh) xor ((z >> 7) * 11Dh and FFh)
+			z: z xor ((y >> i and 1) * x)
 			i: i - 1
 		]
-		z
+		z and FFh
 	]
 
 	total-bits: function [
@@ -495,10 +508,12 @@ qrcode: context [
 	]
 ]
 
-test-mode: pick [none encode ecc] 2
-r: qrcode/encode-data "01234567" 'H 1 40 1 no
-print r = "000100000010000000001100010101100110000110000000111011000001000111101100"
-r: qrcode/encode-data "AC-42" 'H 1 40 1 no
-print r = "001000000010100111001110111001110010000100000000111011000001000111101100"
-r: qrcode/encode-data "HELLO WORLD" 'Q 1 40 1 no
-print r = "00100000010110110000101101111000110100010111001011011100010011010100001101000000111011000001000111101100"
+;test-mode: pick [none encode ecc] 2
+;r: qrcode/encode-data "01234567" 'H 1 40 1 no
+;print r = "000100000010000000001100010101100110000110000000111011000001000111101100"
+;r: qrcode/encode-data "AC-42" 'H 1 40 1 no
+;print r = "001000000010100111001110111001110010000100000000111011000001000111101100"
+;r: qrcode/encode-data "HELLO WORLD" 'Q 1 40 1 no
+;print r = "00100000010110110000101101111000110100010111001011011100010011010100001101000000111011000001000111101100"
+;test-mode: pick [none encode ecc] 3
+;r: qrcode/encode-data "HELLO WORLD" 'Q 1 40 1 no
