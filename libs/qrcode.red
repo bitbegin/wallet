@@ -33,8 +33,6 @@ qrcode: context [
 		res: make binary! len
 		append/dup res 0 len
 	]
-	temp-buffer: max-buffer
-	qrcode-buffer: copy temp-buffer
 
 	get-version-size: function [version [integer!]][
 		if version > version-end [return none]
@@ -277,7 +275,6 @@ qrcode: context [
 			if version >= max-version [return none]
 			version: version + 1
 		]
-
 		if boost-ecl? [
 			ecls: [M Q H]
 			forall ecls [
@@ -289,19 +286,9 @@ qrcode: context [
 		unless qrcode: encode-padding segs used-bits version ecl [
 			return none
 		]
-		;probe qrcode
 		if test-mode = 'encode [return qrcode]
 		qrcode: debase/base qrcode 2
-		probe qrcode
-		len: length? qrcode
-		i: 1
-		while [i <= len][
-			poke qrcode-buffer i qrcode/(i)
-			i: i + 1
-		]
-		qrcode: qrcode-buffer
 		encode-ecc qrcode version ecl
-		probe temp-buffer
 	]
 
 	encode-padding: function [
@@ -367,32 +354,34 @@ qrcode: context [
 		data-len: get-data-code-words-bytes version ecl
 		num-short-blocks: num-blocks - (raw-code-words % num-blocks)
 		short-block-data-len: raw-code-words / num-blocks - block-ecc-len
+		res: make binary! raw-code-words
+		append/dup res 0 raw-code-words
 
 		generator: calc-reed-solomon-generator block-ecc-len
 		dat: data
 		i: 1
 		while [i <= num-blocks][
-			dlen: short-block-data-len + either (i - 1) < num-short-blocks [0][1]
-			ecc: skip data data-len
-			calc-reed-solomon-remainder dat dlen generator ecc
+			dlen: short-block-data-len + either i <= num-short-blocks [0][1]
+			ecc: calc-reed-solomon-remainder dat dlen generator
 			j: 1 k: i
 			while [j <= dlen][
 				if j = (short-block-data-len + 1) [
 					k: k - num-short-blocks
 				]
-				poke temp-buffer k dat/(j)
+				res/(k): dat/(j)
 				j: j + 1
 				k: k + num-blocks
 			]
-			j: 1 k: data-len + 1
+			j: 1 k: data-len + i
 			while [j <= block-ecc-len][
-				poke temp-buffer k ecc/(j)
+				res/(k): ecc/(j)
 				j: j + 1
 				k: k + num-blocks
 			]
-			dat: skip dat data-len
+			dat: skip dat dlen
 			i: i + 1
 		]
+		res
 	]
 
 	calc-reed-solomon-generator: function [degree [integer!]][
@@ -506,5 +495,3 @@ qrcode: context [
 		none
 	]
 ]
-;test-mode: pick [none encode ecc] 3
-;r: qrcode/encode-data "HELLO WORLD" 'Q 1 40 1 no
