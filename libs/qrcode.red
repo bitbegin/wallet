@@ -421,23 +421,19 @@ qrcode: context [
 		res
 	]
 
-	calc-reed-solomon-remainder: function [data [binary!] data-len [integer!] generator [binary!] res [binary!]][
+	calc-reed-solomon-remainder: function [data [binary!] data-len [integer!] generator [binary!]][
 		degree: length? generator
 		unless all [
 			degree >= 1
 			degree <= REED_SOLOMON_DEGREE_MAX
 		][return none]
-		i: 1
-		while [i <= degree][
-			res/(i): 0
-			i: i + 1
-		]
-		probe data-len
+		res: make binary! degree
+		append/dup res 0 degree
 		i: 1
 		while [i <= data-len][
 			factor: data/(i) xor res/1
 			res: skip res 1
-			res/(degree): 0
+			append res 0
 			j: 1
 			while [j <= degree][
 				res/(j): res/(j) xor finite-field-multiply generator/(j) factor
@@ -445,6 +441,7 @@ qrcode: context [
 			]
 			i: i + 1
 		]
+		res
 	]
 
 	finite-field-multiply: function [x [integer!] y [integer!]][

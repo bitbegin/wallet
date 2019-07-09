@@ -66,7 +66,7 @@ testCalcReedSolomonGenerator: function [][
 		generator/28 = 6Ah
 		generator/30 = 96h
 	][
-		new-error 'testCalcReedSolomonGenerator 30 reduce [generator c]
+		new-error 'testCalcReedSolomonGenerator 30 generator
 	]
 	true
 ]
@@ -76,6 +76,49 @@ either error? e: try [testCalcReedSolomonGenerator][
 	print e
 ][
 	print "testCalcReedSolomonGenerator ok"
+]
+
+testCalcReedSolomonRemainder: function [][
+	generator: qrcode/calc-reed-solomon-generator 3
+	remainder: qrcode/calc-reed-solomon-remainder #{00} 0 generator
+	unless remainder = c: #{000000} [
+		new-error 'testCalcReedSolomonRemainder 3 reduce [remainder c]
+	]
+	generator: qrcode/calc-reed-solomon-generator 4
+	remainder: qrcode/calc-reed-solomon-remainder #{0001} 2 generator
+	unless remainder = c: generator [
+		new-error 'testCalcReedSolomonRemainder 4 reduce [remainder c]
+	]
+	generator: qrcode/calc-reed-solomon-generator 5
+	remainder: qrcode/calc-reed-solomon-remainder #{033A6012C7} 5 generator
+	unless remainder = c: #{CB3616FA9D} [
+		new-error 'testCalcReedSolomonRemainder 5 reduce [remainder c]
+	]
+	generator: qrcode/calc-reed-solomon-generator 30
+	remainder: qrcode/calc-reed-solomon-remainder #{3871DBF9D728F68EFE5EE67D7DB2A558BC28235314D561C0206CDEDEFC79B08B786B49D01AADF3EF527D9A} 43 generator
+	unless all [
+		remainder/1 = CEh
+		remainder/2 = F0h
+		remainder/3 = 31h
+		remainder/4 = DEh
+		remainder/9 = E1h
+		remainder/13 = CAh
+		remainder/18 = E3h
+		remainder/20 = 85h
+		remainder/21 = 50h
+		remainder/25 = BEh
+		remainder/30 = B3h
+	][
+		new-error 'testCalcReedSolomonRemainder 30 remainder
+	]
+	true
+]
+
+either error? e: try [testCalcReedSolomonRemainder][
+	print "testCalcReedSolomonRemainder failed!"
+	print e
+][
+	print "testCalcReedSolomonRemainder ok"
 ]
 
 testEncodeData: function [][
