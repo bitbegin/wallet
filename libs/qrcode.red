@@ -282,15 +282,14 @@ qrcode: context [
 		]
 		probe version
 		probe segs
-		;probe debase/base segs/1/data 2
 		unless qrcode: encode-padding segs used-bits version ecl [
 			return none
 		]
 		;probe qrcode
-		qrcode
-		;qrcode: debase/base qrcode 2
-		;probe qrcode
-		;encode-ecc qrcode version ecl
+		if test-mode = 'encode [return qrcode]
+		qrcode: debase/base qrcode 2
+		probe qrcode
+		encode-ecc qrcode version ecl
 	]
 
 	encode-padding: function [
@@ -496,6 +495,7 @@ qrcode: context [
 	]
 ]
 
+test-mode: pick [none encode ecc] 2
 r: qrcode/encode-data "01234567" 'H 1 40 1 no
 print r = "000100000010000000001100010101100110000110000000111011000001000111101100"
 r: qrcode/encode-data "AC-42" 'H 1 40 1 no
