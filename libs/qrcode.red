@@ -288,7 +288,12 @@ qrcode: context [
 		]
 		if test-mode = 'encode [return qrcode]
 		qrcode: debase/base qrcode 2
-		encode-ecc qrcode version ecl
+		code-words: encode-ecc qrcode version ecl
+		if test-mode = 'ecc [return code-words]
+
+		;now start to draw
+		img: init-func-modules version
+		img
 	]
 
 	encode-padding: function [
@@ -494,4 +499,107 @@ qrcode: context [
 		]
 		none
 	]
+
+	init-func-modules: function [version [integer!]][
+		qrsize: version * 4 + 17
+		len: qrsize * qrsize + 7 / 8 + 1
+		img: make binary! len
+		append/dup img 0 len
+		img/1: qrsize
+
+		;-- timing patterns
+		fill-rect 6 0 1 qrsize img
+		fill-rect 0 6 qrsize 1 img
+
+		;-- finder patterns
+		fill-rect 0 0 9 9 img
+		fill-rect qrsize - 8 0 8 9 img
+		fill-rect 0 qrsize - 8 9 8 img
+
+		aligns: get-align-pattern-pos version
+		num-align: either aligns [length? aligns][0]
+		i: 0
+		while [i < num-align][
+			j: 0
+			while [j < num-align][
+				unless any [
+					all [
+						i = 0
+						j = 0
+					]
+					all [
+						i = 0
+						j = (num-align - 1)
+					]
+					all [
+						i = (num-align - 1)
+						j = 0
+					]
+				][
+					fill-rect aligns/(i + 1) - 2 aligns/(j + 1) - 2 5 5 img
+				]
+				j: j + 1
+			]
+			i: i + 1
+		]
+
+		;-- version block
+		if version >= 7 [
+			fill-rect qrsize - 11 0 3 6 img
+			fill-rect 0 qrsize - 11 6 3 img
+		]
+		img
+	]
+
+	set-module: function [img [binary!] x [integer!] y [integer!] black? [logic!]][
+		qrsize: img/1
+		index: y * qrsize + x
+		bit-index: index and 7
+		byte-index: index >> 3 + 1
+		either black? [
+			img/(byte-index + 1): img/(byte-index + 1) or (1 << bit-index)
+		][
+			img/(byte-index + 1): img/(byte-index + 1) and (1 << bit-index xor FFh)
+		]
+	]
+
+	fill-rect: function [
+		left			[integer!]
+		top				[integer!]
+		width			[integer!]
+		heigth			[integer!]
+		img				[binary!]
+	][
+		dy: 0
+		while [dy < heigth][
+			dx: 0
+			while [dx < width][
+				set-module img left + dx top + dy true
+				dx: dx + 1
+			]
+			dy: dy + 1
+		]
+	]
+
+	get-align-pattern-pos: function [version [integer!]][
+		if version = 1 [return none]
+		num-align: version / 7 + 2
+		res: make binary! num-align
+		append/dup res 0 num-align
+		step: either version = 32 [26][
+			(version * 4 + (num-align * 2) + 1) / (num-align * 2 - 2) * 2
+		]
+		i: num-align - 1
+		pos: version * 4 + 10
+		while [i >= 1][
+			res/(i + 1): pos
+			i: i - 1
+			pos: pos - step
+		]
+		res/1: 6
+		res
+	]
 ]
+
+set 'test-mode pick [none encode ecc] 1
+probe qrcode/encode-data data: "HELLO WORLD" 'Q 1 40 1 no
