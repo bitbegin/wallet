@@ -318,7 +318,6 @@ qrcode: context [
 		]
 		apply-mask mask-img img mask
 		draw-format-bits ecl mask img
-		probe length? img
 		img
 	]
 
@@ -662,12 +661,13 @@ qrcode: context [
 					x: right - j
 					upward: (right + 1 and 2) = 0
 					y: either upward [qrsize - 1 - vert][vert]
-					unless all [
-						get-module img x y
+					if all [
+						not get-module img x y
 						i < (len * 8)
 					][
 						black?: get-bit data/(i >> 3 + 1) 7 - (i and 7)
 						set-module img x y black?
+						i: i + 1
 					]
 					j: j + 1
 				]
@@ -808,14 +808,14 @@ qrcode: context [
 		]
 		bits: (data << 10 or rem) xor 5412h
 		i: 0
-		while [i < 5][
+		while [i <= 5][
 			set-module img 8 i get-bit bits i
 			i: i + 1
 		]
 		set-module img 8 7 get-bit bits 6
 		set-module img 8 8 get-bit bits 7
 		set-module img 7 8 get-bit bits 8
-		i: 0
+		i: 9
 		while [i < 15][
 			set-module img 14 - i 8 get-bit bits i
 			i: i + 1
@@ -826,7 +826,7 @@ qrcode: context [
 			set-module img qrsize - 1 - i 8 get-bit bits i
 			i: i + 1
 		]
-		i: 0
+		i: 8
 		while [i < 15][
 			set-module img 8 qrsize - 15 + i get-bit bits i
 			i: i + 1
@@ -844,7 +844,7 @@ qrcode: context [
 		res: 0.0
 		y: 0
 		while [y < qrsize][
-			run-history: make bianry! 7
+			run-history: make binary! 7
 			append/dup run-history 0 7
 			color: false
 			run-x: 0
@@ -977,7 +977,7 @@ qrcode: context [
 		][true][false]
 	]
 
-	to-image: function [img [binary!]][
+	to-image: function [img [binary!] scale [integer!]][
 		qrsize: img/1
 		len: qrsize * 3 * qrsize * 3
 		bin: make binary! len
@@ -985,18 +985,20 @@ qrcode: context [
 		x: 0
 		while [x < qrsize][
 			y: 0
+			line: make binary! qrsize * 3 * scale
 			while [y < qrsize][
-				append bin either get-module img x y [#{FFFFFF}][#{000000}]
+				p: either get-module img x y [#{000000}][#{FFFFFF}]
+				append/dup line p scale
 				y: y + 1
 			]
+			append/dup bin line scale
 			x: x + 1
 		]
-		make image! reduce [to pair! reduce [qrsize qrsize] bin]
+		make image! reduce [to pair! reduce [qrsize * scale qrsize * scale] bin]
 	]
 ]
 
 set 'test-mode pick [none encode ecc] 1
-probe img: qrcode/encode-data data: "HELLO WORLD" 'Q 20 40 1 no
-test-image: qrcode/to-image img
-probe test-image
+img: qrcode/encode-data data: "HELLO WORLD" 'L 1 40 1 no
+test-image: qrcode/to-image img 8
 view [image test-image]
