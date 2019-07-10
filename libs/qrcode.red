@@ -293,6 +293,32 @@ qrcode: context [
 
 		;now start to draw
 		img: init-func-modules version
+		;draw-code-words code-words (get-data-modules-bits version) / 8 img
+		draw-code-words code-words img
+		draw-white-func-modules img version
+		mask-img: init-func-modules version
+		if mask = -1 [
+			min-penalty: none
+			i: 0
+			while [i < 8][
+				msk: i
+				apply-mask mask-img img msk
+				draw-format-bits ecl msk img
+				penalty: get-penalty-score img
+				if any [
+					min-penalty = none
+					penalty < min-penalty
+				][
+					mask: msk
+					min-penalty: penalty
+				]
+				apply-mask mask-img img msk
+				i: i + 1
+			]
+		]
+		apply-mask mask-img img mask
+		draw-format-bits ecl mask img
+		probe length? img
 		img
 	]
 
@@ -551,6 +577,16 @@ qrcode: context [
 		img
 	]
 
+	get-module: function [img [binary!] x [integer!] y [integer!]][
+		qrsize: img/1
+		index: y * qrsize + x
+		get-bit img/(index >> 3 + 1 + 1) index and 7
+	]
+
+	get-bit: function [x [integer!] i [integer!]][
+		(x >> i and 1) <> 0
+	]
+
 	set-module: function [img [binary!] x [integer!] y [integer!] black? [logic!]][
 		qrsize: img/1
 		index: y * qrsize + x
@@ -560,6 +596,18 @@ qrcode: context [
 			img/(byte-index + 1): img/(byte-index + 1) or (1 << bit-index)
 		][
 			img/(byte-index + 1): img/(byte-index + 1) and (1 << bit-index xor FFh)
+		]
+	]
+
+	set-module-bounded: function [img [binary!] x [integer!] y [integer!] black? [logic!]][
+		qrsize: img/1
+		if all [
+			x >= 0
+			x < qrsize
+			y >= 0
+			y < qrsize
+		][
+			set-module img x y black?
 		]
 	]
 
@@ -598,6 +646,335 @@ qrcode: context [
 		]
 		res/1: 6
 		res
+	]
+
+	draw-code-words: function [data [binary!] img [binary!]][
+		qrsize: img/1
+		len: length? data
+		i: 0
+		right: qrsize - 1
+		while [right >= 1][
+			if right = 6 [right: 5]
+			vert: 0
+			while [vert < qrsize][
+				j: 0
+				while [j < 2][
+					x: right - j
+					upward: (right + 1 and 2) = 0
+					y: either upward [qrsize - 1 - vert][vert]
+					unless all [
+						get-module img x y
+						i < (len * 8)
+					][
+						black?: get-bit data/(i >> 3 + 1) 7 - (i and 7)
+						set-module img x y black?
+					]
+					j: j + 1
+				]
+				vert: vert + 1
+			]
+			right: right - 2
+		]
+	]
+
+	draw-white-func-modules: function [img [binary!] version [integer!]][
+		qrsize: img/1
+		i: 7
+		;-- timing patterns
+		while [i < (qrsize - 7)][
+			set-module img 6 i false
+			set-module img i 6 false
+			i: i + 2
+		]
+
+		;-- finder patterns
+		dy: -4
+		while [dy <= 4][
+			dx: -4
+			while [dx <= 4][
+				dist: absolute dx
+				if (absolute dy) > dist [
+					dist: absolute dy
+				]
+				if any [
+					dist = 2
+					dist = 4
+				][
+					set-module-bounded img 3 + dx 3 + dy false
+					set-module-bounded img qrsize - 4 + dx 3 + dy false
+					set-module-bounded img 3 + dx qrsize - 4 + dy false
+				]
+				dx: dx + 1
+			]
+			dy: dy + 1
+		]
+
+		;-- align patterns
+		aligns: get-align-pattern-pos version
+		num-align: either aligns [length? aligns][0]
+		i: 0
+		while [i < num-align][
+			j: 0
+			while [j < num-align][
+				if any [
+					all [
+						i = 0
+						j = 0
+					]
+					all [
+						i = 0
+						j = (num-align - 1)
+					]
+					all [
+						i = (num-align - 1)
+						j = 0
+					]
+				][
+					j: j + 1
+					continue
+				]
+				dy: -1
+				while [dy <= 1][
+					dx: -1
+					while [dx <= 1][
+						black?: either all [dx = 0 dy = 0][true][false]
+						set-module img aligns/(i + 1) + dx aligns/(j + 1) + dy black?
+						dx: dx + 1
+					]
+					dy: dy + 1
+				]
+				j: j + 1
+			]
+			i: i + 1
+		]
+
+		;-- version blocks
+		if version >= 7 [
+			rem: version
+			i: 0
+			while [i < 12][
+				rem: (rem << 1) xor (rem >> 11 * 1F25h)
+				i: i + 1
+			]
+			bits: version << 12 or rem
+			i: 0
+			while [i < 6][
+				j: 0
+				while [j < 3][
+					k: qrsize - 11 + j
+					black?: (bits and 1) <> 0
+					set-module img k i black?
+					set-module img i k black?
+					bits: bits >> 1
+					j: j + 1
+				]
+				i: i + 1
+			]
+		]
+	]
+
+	apply-mask: function [func-modules [binary!] mask-img [binary!] mask [integer!]][
+		qrsize: mask-img/1
+		y: 0
+		while [y < qrsize][
+			x: 0
+			while [x < qrsize][
+				if get-module func-modules x y [x: x + 1 continue]
+				invert: true
+				switch mask [
+					0	[invert: (x + y % 2) = 0]
+					1	[invert: (y % 2) = 0]
+					2	[invert: (x % 3) = 0]
+					3	[invert: (x + y % 3) = 0]
+					4	[invert: (x / 3 + (y / 2) % 2) = 0]
+					5	[invert: (x * y % 2 + (x * y % 3)) = 0]
+					6	[invert: (x * y % 2 + (x * y % 3) % 2) = 0]
+					7	[invert: (x + y % 2 + (x * y % 3) % 2) = 0]
+				]
+				val:  get-module mask-img x y
+				set-module mask-img x y val xor invert
+				x: x + 1
+			]
+			y: y + 1
+		]
+	]
+
+	draw-format-bits: function [ecl [word!] mask [integer!] img [binary!]][
+		table: [L 1 M 0 Q 3 H 2]
+		data: table/(ecl) << 3 or mask
+		rem: data
+		loop 10 [
+			rem: (rem << 1) xor (rem >> 9 * 0537h)
+		]
+		bits: (data << 10 or rem) xor 5412h
+		i: 0
+		while [i < 5][
+			set-module img 8 i get-bit bits i
+			i: i + 1
+		]
+		set-module img 8 7 get-bit bits 6
+		set-module img 8 8 get-bit bits 7
+		set-module img 7 8 get-bit bits 8
+		i: 0
+		while [i < 15][
+			set-module img 14 - i 8 get-bit bits i
+			i: i + 1
+		]
+		qrsize: img/1
+		i: 0
+		while [i < 8][
+			set-module img qrsize - 1 - i 8 get-bit bits i
+			i: i + 1
+		]
+		i: 0
+		while [i < 15][
+			set-module img 8 qrsize - 15 + i get-bit bits i
+			i: i + 1
+		]
+		set-module img 8 qrsize - 8 true
+	]
+
+	PENALTY_N1:  3
+	PENALTY_N2:  3
+	PENALTY_N3: 40
+	PENALTY_N4: 10
+
+	get-penalty-score: function [img [binary!]][
+		qrsize: img/1
+		res: 0.0
+		y: 0
+		while [y < qrsize][
+			run-history: make bianry! 7
+			append/dup run-history 0 7
+			color: false
+			run-x: 0
+			x: 0
+			while [x < qrsize][
+				either color = get-module img x y [
+					run-x: run-x + 1
+					either run-x = 5 [
+						res: res + PENALTY_N1
+					][
+						if run-x > 5 [
+							res: res + 1
+						]
+					]
+				][
+					add-run-to-history run-x run-history
+					if all [
+						not color
+						has-finder-like-pattern run-history
+					][
+						res: res + PENALTY_N3
+					]
+					color: get-module img x y
+					run-x: 1
+				]
+				x: x + 1
+			]
+			add-run-to-history run-x run-history
+			if color [
+				add-run-to-history 0 run-history
+			]
+			if has-finder-like-pattern run-history [
+				res: res + PENALTY_N3
+			]
+			y: y + 1
+		]
+
+		x: 0
+		while [x < qrsize][
+			run-history: make bianry! 7
+			append/dup run-history 0 7
+			color: false
+			run-y: 0
+			y: 0
+			while [y < qrsize][
+				either color = get-module img x y [
+					run-y: run-y + 1
+					either run-y = 5 [
+						res: res + PENALTY_N1
+					][
+						if run-y > 5 [
+							res: res + 1
+						]
+					]
+				][
+					add-run-to-history run-y run-history
+					if all [
+						not color
+						has-finder-like-pattern run-history
+					][
+						res: res + PENALTY_N3
+					]
+					color: get-module img x y
+					run-y: 1
+				]
+				y: y = 1
+			]
+			add-run-to-history run-y run-history
+			if color [
+				add-run-to-history 0 run-history
+			]
+			if has-finder-like-pattern run-history [
+				res: res + PENALTY_N3
+			]
+			x: x + 1
+		]
+
+		y: 0
+		while [y < (qrsize - 1)][
+			x: 0
+			while [x < (qrsize - 1)][
+				color: get-module img x y
+				if all [
+					color = get-module x + 1 y
+					color = get-module x y + 1
+					color = get-module x + 1 y + 1
+				][
+					res: res + PENALTY_N2
+				]
+				x: x + 1
+			]
+			y: y + 1
+		]
+
+		black: 0
+		y: 0
+		while [y < qrsize][
+			x: 0
+			while [x < qrsize][
+				if get-module img x y [
+					black: black + 1
+				]
+				x: x + 1
+			]
+			y: y + 1
+		]
+		total: as float! qrsize * qrsize
+		k: (absolute ((as float! black) * 20 - (total * 10))) + total - 1 / total - 1
+		res: res + (k * PENALTY_N4)
+		res
+	]
+
+	add-run-to-history: function [run [integer!] history [binary!]][
+		insert history run
+		remove back tail history
+	]
+
+	has-finder-like-pattern: function [history [binary!]][
+		n: history/2
+		either all [
+			n > 0
+			history/3 = n
+			history/5 = n
+			history/6 = n
+			history/4 = n * 3
+			any [
+				history/1 >= n * 4
+				history/7 >= n * 4
+			]
+		][true][false]
 	]
 ]
 
