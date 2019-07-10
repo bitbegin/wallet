@@ -75,7 +75,7 @@ qrcode: context [
 
 	alphanumber-mode?: function [str [string!]][
 		forall str [
-			unless find alphanumber str/1 [return false]
+			unless find/case alphanumber str/1 [return false]
 		]
 		true
 	]
@@ -235,7 +235,7 @@ qrcode: context [
 				unless blen: get-segment-bits 'byte bin-len [return none]
 				seg: reduce [
 					'mode 'byte
-					'num-chars get-segment-bits 'byte bin-len
+					'num-chars bin-len
 					'data enbase/base bin 2
 				]
 			]
@@ -999,6 +999,6 @@ qrcode: context [
 ]
 
 set 'test-mode pick [none encode ecc] 1
-img: qrcode/encode-data data: "HELLO WORLD" 'L 1 40 -1 no
+img: qrcode/encode-data data: "bitcoin:n4d8tkDrhF7PcDTPSuUckT927GHonewV7T" 'L 1 40 -1 no
 test-image: qrcode/to-image img 8
 view [image test-image]
