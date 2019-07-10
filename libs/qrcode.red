@@ -884,7 +884,7 @@ qrcode: context [
 
 		x: 0
 		while [x < qrsize][
-			run-history: make bianry! 7
+			run-history: make binary! 7
 			append/dup run-history 0 7
 			color: false
 			run-y: 0
@@ -910,7 +910,7 @@ qrcode: context [
 					color: get-module img x y
 					run-y: 1
 				]
-				y: y = 1
+				y: y + 1
 			]
 			add-run-to-history run-y run-history
 			if color [
@@ -928,9 +928,9 @@ qrcode: context [
 			while [x < (qrsize - 1)][
 				color: get-module img x y
 				if all [
-					color = get-module x + 1 y
-					color = get-module x y + 1
-					color = get-module x + 1 y + 1
+					color = get-module img x + 1 y
+					color = get-module img x y + 1
+					color = get-module img x + 1 y + 1
 				][
 					res: res + PENALTY_N2
 				]
@@ -951,8 +951,8 @@ qrcode: context [
 			]
 			y: y + 1
 		]
-		total: as float! qrsize * qrsize
-		k: (absolute ((as float! black) * 20 - (total * 10))) + total - 1 / total - 1
+		total: to float! qrsize * qrsize
+		k: (absolute ((to float! black) * 20 - (total * 10))) + total - 1 / total - 1
 		res: res + (k * PENALTY_N4)
 		res
 	]
@@ -969,10 +969,10 @@ qrcode: context [
 			history/3 = n
 			history/5 = n
 			history/6 = n
-			history/4 = n * 3
+			history/4 = (n * 3)
 			any [
-				history/1 >= n * 4
-				history/7 >= n * 4
+				history/1 >= (n * 4)
+				history/7 >= (n * 4)
 			]
 		][true][false]
 	]
@@ -999,6 +999,6 @@ qrcode: context [
 ]
 
 set 'test-mode pick [none encode ecc] 1
-img: qrcode/encode-data data: "HELLO WORLD" 'L 1 40 1 no
+img: qrcode/encode-data data: "HELLO WORLD" 'L 1 40 -1 no
 test-image: qrcode/to-image img 8
 view [image test-image]
