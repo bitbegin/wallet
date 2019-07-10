@@ -976,7 +976,27 @@ qrcode: context [
 			]
 		][true][false]
 	]
+
+	to-image: function [img [binary!]][
+		qrsize: img/1
+		len: qrsize * 3 * qrsize * 3
+		bin: make binary! len
+		;append/dup bin 0 len
+		x: 0
+		while [x < qrsize][
+			y: 0
+			while [y < qrsize][
+				append bin either get-module img x y [#{FFFFFF}][#{000000}]
+				y: y + 1
+			]
+			x: x + 1
+		]
+		make image! reduce [to pair! reduce [qrsize qrsize] bin]
+	]
 ]
 
 set 'test-mode pick [none encode ecc] 1
-probe qrcode/encode-data data: "HELLO WORLD" 'Q 1 40 1 no
+probe img: qrcode/encode-data data: "HELLO WORLD" 'Q 20 40 1 no
+test-image: qrcode/to-image img
+probe test-image
+view [image test-image]
