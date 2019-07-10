@@ -999,6 +999,9 @@ qrcode: context [
 ]
 
 set 'test-mode pick [none encode ecc] 1
-img: qrcode/encode-data data: "bitcoin:n4d8tkDrhF7PcDTPSuUckT927GHonewV7T" 'L 1 40 -1 no
-test-image: qrcode/to-image img 8
+start: now/time/precise
+img: qrcode/encode-data data: "bitcoin:n4d8tkDrhF7PcDTPSuUckT927GHonewV7T" 'H 1 40 -1 no
+test-image: qrcode/to-image img 4
+end: now/time/precise
+print [start end]
 view [image test-image]
